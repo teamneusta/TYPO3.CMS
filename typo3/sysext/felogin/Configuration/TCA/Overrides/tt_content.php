@@ -9,7 +9,7 @@ call_user_func(function () {
         // Add the FlexForm
         \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
             '*',
-            'FILE:EXT:felogin/Configuration/FlexForms/Login.xml',
+            'FILE:EXT:felogin/Configuration/FlexForms/PiBase/Login.xml',
             'login'
         );
 
@@ -75,5 +75,12 @@ call_user_func(function () {
                 rowDescription,
             --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
         ';
+    } else {
+        // Add the FlexForm
+        \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
+            '*',
+            'FILE:EXT:felogin/Configuration/FlexForms/Login.xml',
+            'felogin_login'
+        );
     }
 });
