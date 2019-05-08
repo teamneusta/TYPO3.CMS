@@ -9,7 +9,7 @@ defined('TYPO3_MODE') or die();
         // Add the FlexForm
         \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
             '*',
-            'FILE:EXT:felogin/Configuration/FlexForms/PiBase/Login.xml',
+            'FILE:EXT:felogin/Configuration/FlexForms/Login.xml',
             'login'
         );
 
@@ -75,12 +75,5 @@ defined('TYPO3_MODE') or die();
                 rowDescription,
             --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
         ';
-    } else {
-        // Add the FlexForm
-        \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
-            '*',
-            'FILE:EXT:felogin/Configuration/FlexForms/Login.xml',
-            'felogin_login'
-        );
     }
 })();
