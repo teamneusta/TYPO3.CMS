@@ -20,7 +20,6 @@ use TYPO3\CMS\Core\Authentication\LoginType;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Context\Exception\AspectNotFoundException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
 
@@ -47,7 +46,7 @@ class LoginController extends ActionController
         $this->view->assignMultiple(
             [
                 'messageKey' => $this->getStatusMessage($loginType, $isLoggedInd),
-                'storagePid' => $this->getStoragePid(),
+                'storagePid' => $this->settings['pages'],
                 'permaloginStatus' => $this->getPermaloginStatus()
             ]
         );
@@ -82,21 +81,9 @@ class LoginController extends ActionController
         $this->view->assignMultiple(
             [
                 'user' => $GLOBALS['TSFE']->fe_user->user ?? [],
-                'storagePid' => $this->getStoragePid(),
+                'storagePid' => $this->settings['pages'],
             ]
         );
-    }
-
-    /**
-     * returns the parsed storagePid list including recursions
-     *
-     * @return string
-     */
-    protected function getStoragePid(): string
-    {
-        return (string)($this->configurationManager->getConfiguration(
-                ConfigurationManagerInterface::CONFIGURATION_TYPE_FRAMEWORK
-            )['persistence']['storagePid'] ?? '');
     }
 
     /**

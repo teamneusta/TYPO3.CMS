@@ -1,5 +1,28 @@
 plugin.tx_felogin_login {
   settings {
     showPermaLogin = {$styles.content.loginform.showPermaLogin}
+
+    # Template
+    dateFormat = {$styles.content.loginform.dateFormat}
+
+    # E-Mail Settings
+    email_from = {$styles.content.loginform.emailFrom}
+    email_fromName = {$styles.content.loginform.emailFromName}
+    replyTo = {$styles.content.loginform.replyToEmail}
+    email_htmlTemplatePath = {$styles.content.loginform.emailHtmlTemplatePath}
+    email_plainTemplatePath = {$styles.content.loginform.emailPlainTemplatePath}
+
+    # Security
+    forgotLinkHashValidTime = {$styles.content.loginform.forgotLinkHashValidTime}
+    newPasswordMinLength = {$styles.content.loginform.newPasswordMinLength}
+    passwordValidators {
+      10 = TYPO3\CMS\Extbase\Validation\Validator\NotEmptyValidator
+      20 {
+        className = TYPO3\CMS\Extbase\Validation\Validator\StringLengthValidator
+        options {
+          minimum = {$styles.content.loginform.newPasswordMinLength}
+        }
+      }
+    }
   }
 }

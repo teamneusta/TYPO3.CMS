@@ -37,10 +37,12 @@ defined('TYPO3_MODE') or die();
             'TYPO3.CMS.Felogin',
             'Login',
             [
-                'Login' => 'login, overview'
+                'Login' => 'login, overview',
+                'PasswordRecovery' => 'recovery,showChangePassword,changePassword'
             ],
             [
-                'Login' => 'login, overview'
+                'Login' => 'login, overview',
+                'PasswordRecovery' => 'recovery,showChangePassword,changePassword'
             ],
             \TYPO3\CMS\Extbase\Utility\ExtensionUtility::PLUGIN_TYPE_CONTENT_ELEMENT
         );
