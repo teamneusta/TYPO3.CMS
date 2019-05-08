@@ -22,6 +22,21 @@
 							</config>
 						</TCEforms>
 					</settings.showPermaLogin>
+					<settings.showLogoutFormAfterLogin>
+						<TCEforms>
+							<label>LLL:EXT:felogin/Resources/Private/Language/Database.xlf:tt_content.pi_flexform.show_logoutFormAfterLogin</label>
+							<config>
+								<default></default>
+								<type>check</type>
+								<items type="array">
+									<numIndex index="1" type="array">
+										<numIndex index="0">LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.enabled</numIndex>
+										<numIndex index="1">1</numIndex>
+									</numIndex>
+								</items>
+							</config>
+						</TCEforms>
+					</settings.showLogoutFormAfterLogin>
 				</el>
 			</ROOT>
 		</sDEF>
