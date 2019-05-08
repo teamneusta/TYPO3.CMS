@@ -85,25 +85,8 @@ class LoginControllerTest extends UnitTestCase
     {
         $this->setUserLoggedIn(false);
 
-        $this->configurationManager
-            ->getConfiguration(
-                ConfigurationManagerInterface::CONFIGURATION_TYPE_FRAMEWORK
-            )
-            ->willReturn(
-                [
-                    'persistence' => [
-                        'storagePid' => '1,2,3'
-                    ]
-                ]
-            );
-
-        $this->view
-            ->assignMultiple(
-                Argument::withEntry(
-                    'storagePid', '1,2,3'
-                )
-            )
-            ->shouldBeCalled();
+        $this->inject($this->subject, 'settings', ['pages' => '1,2,3']);
+        $this->view->assignMultiple(Argument::withEntry('storagePid', '1,2,3'))->shouldBeCalled();
 
         $this->subject->loginAction();
     }
@@ -202,15 +185,9 @@ class LoginControllerTest extends UnitTestCase
         $GLOBALS['TYPO3_CONF_VARS']['FE']['permalogin'] = $conf;
         $GLOBALS['TYPO3_CONF_VARS']['FE']['lifetime'] = $lifetime;
 
-        $this->inject($this->subject, 'settings', ['showPermaLogin' => $settings]);
+        $this->inject($this->subject, 'settings', ['showPermaLogin' => $settings, 'pages' => '1,2,3']);
 
-        $this->view
-            ->assignMultiple(
-                Argument::withEntry(
-                    'permaloginStatus', $expected
-                )
-            )
-            ->shouldBeCalled();
+        $this->view->assignMultiple(Argument::withEntry('permaloginStatus', $expected))->shouldBeCalled();
 
         $this->subject->loginAction();
     }
