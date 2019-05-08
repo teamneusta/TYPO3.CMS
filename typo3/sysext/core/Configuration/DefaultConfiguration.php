@@ -74,7 +74,7 @@ return [
         'features' => [
             'redirects.hitCount' => false,
             'unifiedPageTranslationHandling' => false,
-            'felogin.pibase' => true,
+            'felogin.extbase' => false,
         ],
         'createGroup' => '',
         'sitename' => 'TYPO3',
