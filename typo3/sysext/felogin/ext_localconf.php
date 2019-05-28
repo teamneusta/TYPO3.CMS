@@ -51,3 +51,17 @@ defined('TYPO3_MODE') or die();
         );
     }
 })();
+
+// Register cache if felogin uses extbase version
+(static function (): void {
+    $feloginExtbase = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\Features::class)
+        ->isFeatureEnabled('felogin.extbase');
+    if ($feloginExtbase && !is_array($GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['felogin_labels'])) {
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['felogin_labels'] = [
+            'frontend' => \TYPO3\CMS\Core\Cache\Frontend\VariableFrontend::class,
+            'backend' => \TYPO3\CMS\Core\Cache\Backend\TransientMemoryBackend::class,
+            'groups' => ['pages']
+        ];
+    }
+})();
+
