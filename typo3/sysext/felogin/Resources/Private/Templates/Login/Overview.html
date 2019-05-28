@@ -1,7 +1,8 @@
+{namespace login=TYPO3\CMS\Felogin\ViewHelpers}
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
 <f:if condition="{loginMessage}">
 	<f:then>
-		<h3><f:render partial="RenderLabelOrMessage" arguments="{key: 'success_header'}" /></h3>
+		<h3><login:label identifier="success_header"/></h3>
 	</f:then>
 </f:if>
 
