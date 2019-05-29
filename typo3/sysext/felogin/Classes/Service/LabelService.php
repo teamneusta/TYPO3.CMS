@@ -17,6 +17,8 @@ namespace TYPO3\CMS\Felogin\Service;
  */
 
 use TYPO3\CMS\Core\Cache\CacheManager;
+use TYPO3\CMS\Core\Session\Backend\DatabaseSessionBackend;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Configuration\ConfigurationManager;
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
 
@@ -29,6 +31,8 @@ use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
 class LabelService implements LabelServiceInterface
 {
     protected const CACHE_IDENTIFIER = 'felogin_labels';
+
+    protected const SESSION_KEY_PREFIX = 'felogin_label_';
 
     /**
      * @var \TYPO3\CMS\Core\Cache\Frontend\FrontendInterface
@@ -71,6 +75,9 @@ class LabelService implements LabelServiceInterface
             case array_key_exists($entryIdentifier, $this->statusLabels):
                 $label = $this->statusLabels[$entryIdentifier];
                 break;
+            case $GLOBALS['TSFE']->fe_user->getSessionData(static::SESSION_KEY_PREFIX . $entryIdentifier):
+                $label = $GLOBALS['TSFE']->fe_user->getSessionData(static::SESSION_KEY_PREFIX . $entryIdentifier);
+                break;
             case $this->cache->has($entryIdentifier):
                 $label = $this->cache->get($entryIdentifier);
                 break;
@@ -86,12 +93,17 @@ class LabelService implements LabelServiceInterface
     /**
      * @param string $identifier
      * @param string $value
+     * @param bool $persistInSession
      */
-    public function setLabel(string $identifier, string $value): void
+    public function setLabel(string $identifier, string $value, bool $persistInSession = false): void
     {
         $entryIdentifier = $this->getEntryIdentifier($identifier);
 
-        $this->statusLabels[$entryIdentifier] = $value;
+        if ($persistInSession) {
+            $GLOBALS['TSFE']->fe_user->setAndSaveSessionData(static::SESSION_KEY_PREFIX . $entryIdentifier, $value);
+        } else {
+            $this->statusLabels[$entryIdentifier] = $value;
+        }
     }
 
     /**
