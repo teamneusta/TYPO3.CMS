@@ -18,7 +18,7 @@ namespace TYPO3\CMS\Felogin\ViewHelpers;
 
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Object\ObjectManager;
-use TYPO3\CMS\Felogin\Service\LabelService;
+use TYPO3\CMS\Felogin\Service\LabelServiceInterface;
 use TYPO3Fluid\Fluid\Core\ViewHelper\AbstractViewHelper;
 
 /**
@@ -34,7 +34,7 @@ class LabelViewHelper extends AbstractViewHelper
 
     public function render(): string
     {
-        $labelService = GeneralUtility::makeInstance(ObjectManager::class)->get(LabelService::class);
+        $labelService = GeneralUtility::makeInstance(ObjectManager::class)->get(LabelServiceInterface::class);
 
         return $labelService->getLabel($this->arguments['identifier']);
     }

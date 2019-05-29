@@ -26,7 +26,7 @@ use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
  *
  * @internal this is a concrete TYPO3 implementation and solely used for EXT:felogin and not part of TYPO3's Core API.
  */
-class LabelService
+class LabelService implements LabelServiceInterface
 {
     protected const CACHE_IDENTIFIER = 'felogin_labels';
 
@@ -39,6 +39,11 @@ class LabelService
      * @var \TYPO3\CMS\Extbase\Configuration\ConfigurationManager
      */
     protected $configurationManager;
+
+    /**
+     * @var string[]
+     */
+    protected $statusLabels = [];
 
     /**
      * LabelService constructor.
@@ -60,30 +65,72 @@ class LabelService
      */
     public function getLabel(string $identifier, ?array $arguments = null): string
     {
-        $uid = $this->configurationManager->getContentObject()->data['uid'];
-        $entryIdentifier = md5($uid . $identifier);
+        $entryIdentifier = $this->getEntryIdentifier($identifier);
 
-        if ($this->cache->has($entryIdentifier)) {
-            return $this->cache->get($entryIdentifier);
+        switch ($entryIdentifier) {
+            case array_key_exists($entryIdentifier, $this->statusLabels):
+                $label = $this->statusLabels[$entryIdentifier];
+                break;
+            case $this->cache->has($entryIdentifier):
+                $label = $this->cache->get($entryIdentifier);
+                break;
+            default:
+                $label = $this->resolveLabelByIdentifier($identifier, $arguments);
+
+                $this->cache->set($entryIdentifier, $label);
         }
-
-        $settings = $this->configurationManager->getConfiguration(ConfigurationManager::CONFIGURATION_TYPE_SETTINGS);
-        if (!empty($settings[$identifier])) {
-            $identifier = $settings[$identifier];
-        }
-
-        $label = $this->translate($identifier, $arguments) ?? $identifier;
-
-        $this->cache->set($entryIdentifier, $label);
 
         return $label;
     }
 
-    private function translate(string $identifier, ?array $arguments): ?string
+    /**
+     * @param string $identifier
+     * @param string $value
+     */
+    public function setLabel(string $identifier, string $value): void
+    {
+        $entryIdentifier = $this->getEntryIdentifier($identifier);
+
+        $this->statusLabels[$entryIdentifier] = $value;
+    }
+
+    /**
+     * @param string $identifier
+     * @param array|null $arguments
+     * @return string|null
+     */
+    protected function translate(string $identifier, ?array $arguments): ?string
     {
         return LocalizationUtility::translate($identifier, 'felogin', $arguments)
             //try again with prefix
             ?? LocalizationUtility::translate('ll_' . $identifier, 'felogin', $arguments);
     }
-}
 
+    /**
+     * @param string $identifier
+     * @return string
+     */
+    protected function getEntryIdentifier(string $identifier): string
+    {
+        $uid = $this->configurationManager->getContentObject()->data['uid'];
+
+        return md5($uid . $identifier);
+    }
+
+    /**
+     * @param string $identifier
+     * @param array|null $arguments
+     * @return string
+     * @throws \TYPO3\CMS\Extbase\Configuration\Exception\InvalidConfigurationTypeException
+     */
+    protected function resolveLabelByIdentifier(string $identifier, ?array $arguments): string
+    {
+        $settings = $this->configurationManager->getConfiguration(ConfigurationManager::CONFIGURATION_TYPE_SETTINGS);
+
+        if (!empty($settings[$identifier])) {
+            $identifier = $settings[$identifier];
+        }
+
+        return $this->translate($identifier, $arguments) ?? $identifier;
+    }
+}

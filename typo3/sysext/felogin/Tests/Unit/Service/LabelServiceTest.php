@@ -61,11 +61,16 @@ class LabelServiceTest extends UnitTestCase
         $this->configurationManager->getConfiguration(ConfigurationManager::CONFIGURATION_TYPE_SETTINGS)->shouldNotHaveBeenCalled();
     }
 
-//    public function getLabelShouldPrioritizeFlexFormValues(): void
-//    {
-//        $this->configurationManager->getConfiguration(ConfigurationManager::CONFIGURATION_TYPE_SETTINGS)
-//            ->willReturn(['label' => 'my flexform value']);
-//
-//        $this->subject->getLabel('label');
-//    }
+    /**
+     * @test
+     */
+    public function getLabelShouldReturnLabelFromSetLabelInsteadOfFromCache(): void
+    {
+        $this->subject->setLabel('myIdentifier', 'label overriding');
+        $actual = $this->subject->getLabel('myIdentifier');
+
+        static::assertSame('label overriding', $actual);
+        $this->configurationManager->getConfiguration(ConfigurationManager::CONFIGURATION_TYPE_SETTINGS)->shouldNotHaveBeenCalled();
+        $this->cache->get(Argument::any())->shouldNotHaveBeenCalled();
+    }
 }
