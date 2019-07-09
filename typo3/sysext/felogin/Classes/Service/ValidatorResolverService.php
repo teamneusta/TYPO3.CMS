@@ -28,13 +28,16 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 class ValidatorResolverService implements SingletonInterface
 {
     /**
-     * @param array $validatorConfigs
+     * Resolves Validator classes based on the $validatorConfig. This array can either
+     * contain a FQCN or an array with keys "className"(string) and "options"(array).
+     *
+     * @param array $validatorConfig
      *
      * @return Generator
      */
-    public function resolve(array $validatorConfigs): Generator
+    public function resolve(array $validatorConfig): Generator
     {
-        foreach ($validatorConfigs as $validator) {
+        foreach ($validatorConfig as $validator) {
             if (is_string($validator)) {
                 yield GeneralUtility::makeInstance($validator);
             } elseif (is_array($validator)) {

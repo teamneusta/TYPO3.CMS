@@ -53,16 +53,14 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
      */
     public function sendRecoveryEmail(string $emailAddress): void
     {
+        $this->validateTypoScriptSettings();
+
         $hash = $this->getLifeTimeTimestamp() . '|' . $this->generateHash();
         $this->setForgotHashForUserByEmail($emailAddress, $hash);
         $userInformation = $this->fetchUserInformationByEmail($emailAddress);
-
         $receiver = $this->getReceiverName($userInformation);
 
-        $this->validateTypoScriptSettings();
-
         $email = $this->prepareMail($receiver, $emailAddress, $hash);
-
         GeneralUtility::makeInstance(Mailer::class)->send($email);
     }
 
