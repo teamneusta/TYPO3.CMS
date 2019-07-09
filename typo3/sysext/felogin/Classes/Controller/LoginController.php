@@ -18,6 +18,7 @@ namespace TYPO3\CMS\Felogin\Controller;
 
 use TYPO3\CMS\Core\Authentication\LoginType;
 use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
@@ -183,5 +184,251 @@ class LoginController extends ActionController
         }
 
         return $messageKey;
+    }
+
+
+    /**
+     *
+     * REDIRECT RELATED STUFF
+     *
+     */
+
+    /**
+     * Processes options for redirect after login and returns url
+     * @ToDo: Refactor stuff from old piBase Extension, i.e. $this->logintype
+     * @return string
+     */
+    private function processLoginRedirects():string
+    {
+
+        if ($this->dontRedirect()) {
+            return '';
+        }
+
+        // Login error
+        if ($this->logintype === LoginType::LOGIN && !$this->isUserLoggedIn()) {
+            if (in_array('loginError', GeneralUtility::trimExplode(',', $this->conf['redirectMode'], true))) {
+                return $this->conf['redirectPageLoginError'];
+            }
+        }
+
+        // Successful login
+
+        $redirectUrls = [];
+        $modes =  $this->fetchRedirectModesFromConf();
+
+        foreach($modes as $mode) {
+            switch ($mode) {
+                case 'groupLogin':
+                    $redirectUrls[] = $this->fetchGroupRedirect();
+                    break;
+                case 'userLogin':
+                    $redirectUrls[] = $this->fetchUserRedirect();
+                    break;
+                case 'login':
+                    if ($this->conf['redirectPageLogin']) {
+                        $redirectUrls[] = $this->pi_getPageLink((int)$this->conf['redirectPageLogin']);
+                    }
+                    break;
+                case 'getpost':
+                    $redirectUrls[] = $this->fetchGPRedirect();
+                    break;
+                case 'referer':
+                case 'refererDomains':
+                    $redirectUrls[] = $this->fetchRefererRedirect();
+                    break;
+            }
+        }
+
+        // Remove empty entries
+        // What's that strlen f***?
+        // @ToDo: Do we really want '0' as a valid return value?
+        array_filter($redirectUrls, 'strlen');
+
+        if (sizeof($redirectUrls) == 0) {
+            return '';
+        }
+
+        // Return first or last entry
+        return $this->conf['redirectFirstMethod'] ? array_shift($redirectUrls) : array_pop($redirectUrls);
+    }
+
+
+
+    /**
+     * Processes options for redirect after logout and returns url
+     * @return string
+     */
+    private function processLogoutRedirects():string
+    {
+        if ($this->dontRedirect()) {
+            return '';
+        }
+
+        // Fill me in ;-)
+
+        return '';
+    }
+
+
+    /**
+     * Should this controller make use of possibly configured redirects at all?
+     * @ToDo: Refactor! I.e. no piVars any more ;-)
+     * @return bool
+     */
+    private function dontRedirect():bool
+    {
+        return $this->piVars['noredirect'] || $this->conf['redirectDisable'];
+    }
+
+
+    /**
+     * Check if redirect url was sent via get/post vars
+     * @ToDo: Refactor, replace piBase stuff
+     * @return string
+     */
+    private function fetchGPRedirect(): string
+    {
+
+        if ($this->urlValidator->isValid((string)GeneralUtility::_GP('return_url'))) {
+            return GeneralUtility::_GP('return_url');
+        }
+        if ($this->urlValidator->isValid((string)GeneralUtility::_GP('redirect_url'))) {
+            return GeneralUtility::_GP('return_url');
+        }
+
+        return '';
+    }
+
+    /**
+     * Directly taken from old pibase controller.
+     * @ToDo: Refactor! I.e. $this->frontendController
+     * @return string
+     */
+    private function fetchGroupRedirect():string
+    {
+        // taken from dkd_redirect_at_login written by Ingmar Schlecht; database-field changed
+        $groupData = $this->frontendController->fe_user->groupData;
+        if (!empty($groupData['uid'])) {
+
+            // take the first group with a redirect page
+            $userGroupTable = $this->frontendController->fe_user->usergroup_table;
+            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($userGroupTable);
+            $queryBuilder->getRestrictions()->removeAll();
+            $row = $queryBuilder
+                ->select('felogin_redirectPid')
+                ->from($userGroupTable)
+                ->where(
+                    $queryBuilder->expr()->neq(
+                        'felogin_redirectPid',
+                        $queryBuilder->createNamedParameter('', \PDO::PARAM_STR)
+                    ),
+                    $queryBuilder->expr()->in(
+                        'uid',
+                        $queryBuilder->createNamedParameter(
+                            $groupData['uid'],
+                            Connection::PARAM_INT_ARRAY
+                        )
+                    )
+                )
+                ->execute()
+                ->fetch();
+
+            if ($row) {
+                return $this->pi_getPageLink($row['felogin_redirectPid']);
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Directly taken from old pibase controller.
+     * @ToDo: Refactor! I.e. $this->frontendController
+     * @return string
+     */
+    private function fetchUserRedirect():string
+    {
+        $userTable = $this->frontendController->fe_user->user_table;
+        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($userTable);
+        $queryBuilder->getRestrictions()->removeAll();
+        $row = $queryBuilder
+            ->select('felogin_redirectPid')
+            ->from($userTable)
+            ->where(
+                $queryBuilder->expr()->neq(
+                    'felogin_redirectPid',
+                    $queryBuilder->createNamedParameter('', \PDO::PARAM_STR)
+                ),
+                $queryBuilder->expr()->eq(
+                    $this->frontendController->fe_user->userid_column,
+                    $queryBuilder->createNamedParameter(
+                        $this->frontendController->fe_user->user['uid'],
+                        \PDO::PARAM_INT
+                    )
+                )
+            )
+            ->execute()
+            ->fetch();
+
+        if ($row) {
+            return $this->pi_getPageLink($row['felogin_redirectPid']);
+        }
+
+        return '';
+    }
+
+    /**
+     * @ToDo: Refactor! I.e. no more piVars ;-)
+     * @return string
+     */
+    private function fetchRefererRedirect():string
+    {
+        // Don't redirect if 'redirectReferrer' is set (only possible value='off')
+        if (isset($this->piVars['redirectReferrer'])) {
+            return '';
+        }
+
+        $url = GeneralUtility::_GP('referer') ?: GeneralUtility::getIndpEnv('HTTP_REFERER');
+
+        // @ToDo: Check, if we need explicit query of mode refererDomains here?
+        if ($this->conf['domains']) {
+            // Is referring url allowed to redirect?
+            $match = [];
+            if (preg_match('#^https?://([[:alnum:]._-]+)/#', $url, $match)) {
+                $referer_domain = $match[1];
+                $domainFound = false;
+                foreach (GeneralUtility::trimExplode(',', $this->conf['domains'], true) as $domain) {
+                    if (preg_match('/(?:^|\\.)' . $domain . '$/', $referer_domain)) {
+                        $domainFound = true;
+                        break;
+                    }
+                }
+                if (!$domainFound) {
+                    $url = '';
+                }
+            }
+        }
+
+        return  preg_replace('/[&?]logintype=[a-z]+/', '', $url);
+    }
+
+
+    /**
+     * @ToDo: Replace piBase stuff
+     * @return array
+     */
+    private function fetchRedirectModesFromConf():array
+    {
+        $modes = GeneralUtility::trimExplode(',', $this->conf['redirectMode'], true);
+
+        // Clean array from referer, if both methods referer and refererDomain are set. Both do basically the same.
+        if (in_array('referer', $modes) && in_array('refererDomains', $modes)) {
+            if (($key = array_search('referer', $modes)) !== false) {
+                unset($modes[$key]);
+            }
+        }
+
+        return $modes;
     }
 }
