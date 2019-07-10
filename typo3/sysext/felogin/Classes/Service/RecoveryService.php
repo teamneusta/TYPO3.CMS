@@ -304,8 +304,9 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
             ->html($htmlMailTemplate->render())
             ->text($plainMailTemplate->render());
 
-        if ($this->getReplyTo()) {
-            $mail->addReplyTo($this->getReplyTo());
+        $replyTo = $this->getReplyTo();
+        if ($replyTo) {
+            $mail->addReplyTo($replyTo);
         }
 
         return $mail;

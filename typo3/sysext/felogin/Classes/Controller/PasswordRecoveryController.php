@@ -242,11 +242,11 @@ class PasswordRecoveryController extends ActionController
      *
      * @param string $key
      *
-     * @return string|null
+     * @return string
      */
-    protected function getTranslation(string $key): ?string
+    protected function getTranslation(string $key): string
     {
-        return LocalizationUtility::translate($key, 'felogin');
+        return (string)LocalizationUtility::translate($key, 'felogin');
     }
 
     /**
