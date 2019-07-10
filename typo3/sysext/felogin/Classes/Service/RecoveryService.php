@@ -74,10 +74,11 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
     {
         $queryBuilder = $this->getQueryBuilder();
 
+        $currentTimestamp = GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp');
         $queryBuilder->update('fe_users')
             ->set('password', $passwordHash)
             ->set('felogin_forgotHash', '""', false)
-            ->set('tstamp', (int)$GLOBALS['EXEC_TIME'])
+            ->set('tstamp', $currentTimestamp)
             ->where(
                 $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash))
             )
@@ -335,11 +336,7 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
 
         if (!empty($replyToAddress)) {
             $replyToName = $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailReplyToName'];
-            if (empty($replyToName)) {
-                $address = new Address($replyToAddress);
-            } else {
-                $address = new NamedAddress($replyToAddress, $replyToName);
-            }
+            $address = new NamedAddress($replyToAddress, $replyToName);
         }
 
         return $address;

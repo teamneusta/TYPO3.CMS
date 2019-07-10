@@ -102,8 +102,7 @@ class PasswordRecoveryController extends ActionController
     }
 
     /**
-     * Show the change password form but only if a $hash exists (from get parameters). $hash is sent to the
-     * user per email.
+     * Show the change password form but only if a hash exists (from get parameters).
      *
      * @param string $hash
      */
@@ -176,17 +175,17 @@ class PasswordRecoveryController extends ActionController
     }
 
     /**
-     * Check if a fe user exists with passed $emailOrUsername
+     * Check if a fe user exists with passed email or username
      *
      * @param string $emailOrUsername
      *
-     * @return bool|string
+     * @return string Email or empty string if no email is found
      */
-    protected function fetchEmailFromUser(string $emailOrUsername)
+    protected function fetchEmailFromUser(string $emailOrUsername): string
     {
         $queryBuilder = $this->getQueryBuilder();
 
-        return $queryBuilder->select('email')
+        return (string)$queryBuilder->select('email')
             ->from('fe_users')
             ->where(
                 $queryBuilder->expr()->orX(
