@@ -95,7 +95,7 @@ class PasswordRecoveryController extends ActionController
         //timestamp is expired or hash can not be assigned to a user
         if ($currentTimestamp > $timestamp || !$this->recoveryService->existsUserWithHash($hash)) {
             $result = $this->request->getOriginalRequestMappingResults();
-            $result->addError(new Error($this->getTranslation('password_recovery_link_expired'), 1554994253));
+            $result->addError(new Error($this->getTranslation('change_password_notvalid_message'), 1554994253));
             $this->request->setOriginalRequestMappingResults($result);
             $this->forward('recovery', 'PasswordRecovery', 'felogin');
         }
