@@ -28,7 +28,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 class ValidatorResolverService implements SingletonInterface
 {
     /**
-     * Resolves Validator classes based on the $validatorConfig. This array can either
+     * Resolves Validator classes based on the validator config. This array can either
      * contain a FQCN or an array with keys "className"(string) and "options"(array).
      *
      * @param array $validatorConfig

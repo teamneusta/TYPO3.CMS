@@ -30,7 +30,7 @@ interface RecoveryServiceInterface
     public function sendRecoveryEmail(string $emailAddress): void;
 
     /**
-     * Change the password for an user based on $hash.
+     * Change the password for an user based on hash.
      *
      * @param string $hash The hash of the feUser that should be resolved.
      * @param string $passwordHash The new password.
@@ -38,7 +38,7 @@ interface RecoveryServiceInterface
     public function updatePasswordAndInvalidateHash(string $hash, string $passwordHash): void;
 
     /**
-     * Returns true if a user exists with $hash as `felogin_forgothash`, otherwise false.
+     * Returns true if a user exists with hash as `felogin_forgothash`, otherwise false.
      *
      * @param string $hash The hash of the feUser that should be check for existence.
      * @return bool Either true or false based on the existence of the user.

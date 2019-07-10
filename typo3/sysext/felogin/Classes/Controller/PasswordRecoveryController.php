@@ -217,7 +217,7 @@ class PasswordRecoveryController extends ActionController
         $validators = GeneralUtility::makeInstance(ValidatorResolverService::class)
             ->resolve($this->settings['passwordValidators']);
 
-        // Call each validator on $newPass
+        // Call each validator on new password
         foreach ($validators as $validator) {
             $result = $validator->validate($newPass);
             $originalResult->merge($result);

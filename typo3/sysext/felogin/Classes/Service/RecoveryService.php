@@ -65,10 +65,11 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
     }
 
     /**
-     * Change the password for an user based on $hash.
+     * Change the password for an user based on hash.
      *
      * @param string $hash The hash of the feUser that should be resolved.
      * @param string $passwordHash The new password.
+     * @throws \TYPO3\CMS\Core\Context\Exception\AspectNotFoundException
      */
     public function updatePasswordAndInvalidateHash(string $hash, string $passwordHash): void
     {
@@ -86,7 +87,7 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
     }
 
     /**
-     * Returns true if a user exists with $hash as `felogin_forgothash`, otherwise false.
+     * Returns true if an user exists with hash as `felogin_forgothash`, otherwise false.
      *
      * @param string $hash The hash of the feUser that should be check for existence.
      * @return bool Either true or false based on the existence of the user.
@@ -203,7 +204,6 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
     protected function setForgotHashForUserByEmail(string $emailAddress, string $hash): void
     {
         $queryBuilder = $this->getQueryBuilder();
-
         $queryBuilder->update('fe_users')
             ->where(
                 $queryBuilder->expr()->eq('email', $queryBuilder->createNamedParameter($emailAddress))
