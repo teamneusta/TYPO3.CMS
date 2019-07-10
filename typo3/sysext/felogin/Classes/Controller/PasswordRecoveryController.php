@@ -67,7 +67,7 @@ class PasswordRecoveryController extends ActionController
             $this->recoveryService->sendRecoveryEmail($email);
         }
 
-        $this->addFlashMessage($this->getTranslation('ll_change_password_done_message'));
+        $this->addFlashMessage($this->getTranslation('forgot_reset_message_emailSent'));
 
         $this->redirect('login', 'Login', 'felogin');
     }
