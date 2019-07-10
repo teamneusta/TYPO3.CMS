@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
+use TYPO3\CMS\Felogin\Redirect\RedirectHandler;
 
 /**
  * Used for plugin login
@@ -34,10 +35,29 @@ class LoginController extends ActionController
     public const MESSAGEKEY_LOGOUT = 'logout';
 
     /**
+     * @var RedirectHandler
+     */
+    protected $redirectHandler;
+
+    public function injectRedirecter(RedirectHandler $RedirectHandler): void
+    {
+        $this->redirectHandler = $RedirectHandler;
+    }
+
+    public function initializeAction(): void
+    {
+        // todo: cookie message instead of redirect
+        $this->redirectHandler->process($this->settings, $this->request);
+    }
+
+    /**
      * show login form
      */
     public function loginAction(): void
     {
+        //@todo: noredirect params
+        //@todo: referer
+        //@todo: pivars redirectReferrer
         $loginType = (string)$this->getPropertyFromGetAndPost('logintype');
         $isLoggedInd = $this->isUserLoggedIn();
 
@@ -78,6 +98,7 @@ class LoginController extends ActionController
      */
     public function logoutAction(): void
     {
+        //@todo: noredirect params
         $this->view->assignMultiple(
             [
                 'user'       => $GLOBALS['TSFE']->fe_user->user ?? [],
