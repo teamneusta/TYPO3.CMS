@@ -65,22 +65,73 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
     }
 
     /**
-     * @return int
-     * @throws \TYPO3\CMS\Core\Context\Exception\AspectNotFoundException
-     * @throws \TYPO3\CMS\Extbase\Configuration\Exception\InvalidConfigurationTypeException
+     * Change the password for an user based on $hash.
+     *
+     * @param string $hash The hash of the feUser that should be resolved.
+     * @param string $passwordHash The new password.
      */
-    protected function getLifeTimeTimestamp(): int
+    public function updatePasswordAndInvalidateHash(string $hash, string $passwordHash): void
     {
-        static $timestamp;
+        $queryBuilder = $this->getQueryBuilder();
 
-        if ($timestamp === null) {
-            $lifetimeInHours = $this->getSettings()['forgotLinkHashValidTime'] ?: 12;
-            $currentTimestamp = GeneralUtility::makeInstance(Context::class)
-                ->getPropertyFromAspect('date', 'timestamp');
-            $timestamp = $currentTimestamp + 3600 * $lifetimeInHours;
+        $queryBuilder->update('fe_users')
+            ->set('password', $passwordHash)
+            ->set('felogin_forgotHash', '""', false)
+            ->set('tstamp', (int)$GLOBALS['EXEC_TIME'])
+            ->where(
+                $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash))
+            )
+            ->execute();
+    }
+
+    /**
+     * Returns true if a user exists with $hash as `felogin_forgothash`, otherwise false.
+     *
+     * @param string $hash The hash of the feUser that should be check for existence.
+     * @return bool Either true or false based on the existence of the user.
+     */
+    public function existsUserWithHash(string $hash): bool
+    {
+        $queryBuilder = $this->getQueryBuilder();
+        $predicates = $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash));
+
+        return (bool)$queryBuilder->count('uid')
+            ->from('fe_users')
+            ->where($predicates)
+            ->execute()
+            ->fetchColumn();
+    }
+
+    /**
+     * @throws \TYPO3\CMS\Felogin\Service\IncompleteConfigurationException
+     */
+    protected function validateTypoScriptSettings(): void
+    {
+        if (empty($this->getSenderMailAddress()) || empty($this->getSenderName())) {
+            throw new IncompleteConfigurationException(
+                'Keys "email_from" and "email_fromName" of "plugin.tx_felogin_login.settings" cannot be empty!',
+                1557765301
+            );
         }
 
-        return $timestamp;
+        if (empty($this->getHtmlMailTemplatePath())) {
+            throw new IncompleteConfigurationException(
+                'Key "plugin.tx_felogin_login.settings.email_htmlTemplatePath" cannot be empty!',
+                1562665927
+            );
+        }
+
+        if (empty($this->getTxtMailTemplatePath())) {
+            throw new IncompleteConfigurationException(
+                'Key "plugin.tx_felogin_login.settings.email_htmlTemplatePath" cannot be empty!',
+                1562665945
+            );
+        }
+    }
+
+    protected function getSenderMailAddress(): string
+    {
+        return $this->getSettings()['email_from'] ?: $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailFromAddress'];
     }
 
     /**
@@ -97,6 +148,40 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
         }
 
         return $settings;
+    }
+
+    protected function getSenderName(): string
+    {
+        return $this->getSettings()['email_fromName'] ?: $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailFromName'];
+    }
+
+    protected function getHtmlMailTemplatePath(): string
+    {
+        return $this->getSettings()['email_htmlTemplatePath'];
+    }
+
+    protected function getTxtMailTemplatePath(): string
+    {
+        return $this->getSettings()['email_plainTemplatePath'];
+    }
+
+    /**
+     * @return int
+     * @throws \TYPO3\CMS\Core\Context\Exception\AspectNotFoundException
+     * @throws \TYPO3\CMS\Extbase\Configuration\Exception\InvalidConfigurationTypeException
+     */
+    protected function getLifeTimeTimestamp(): int
+    {
+        static $timestamp;
+
+        if ($timestamp === null) {
+            $lifetimeInHours = $this->getSettings()['forgotLinkHashValidTime'] ?: 12;
+            $currentTimestamp = GeneralUtility::makeInstance(Context::class)
+                ->getPropertyFromAspect('date', 'timestamp');
+            $timestamp = $currentTimestamp + 3600 * $lifetimeInHours;
+        }
+
+        return $timestamp;
     }
 
     /**
@@ -176,70 +261,6 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
     }
 
     /**
-     * @throws \TYPO3\CMS\Felogin\Service\IncompleteConfigurationException
-     */
-    protected function validateTypoScriptSettings(): void
-    {
-        if (empty($this->getSenderMailAddress()) || empty($this->getSenderName())) {
-            throw new IncompleteConfigurationException(
-                'Keys "email_from" and "email_fromName" of "plugin.tx_felogin_login.settings" cannot be empty!',
-                1557765301
-            );
-        }
-
-        if (empty($this->getHtmlMailTemplatePath())) {
-            throw new IncompleteConfigurationException(
-                'Key "plugin.tx_felogin_login.settings.email_htmlTemplatePath" cannot be empty!',
-                1562665927
-            );
-        }
-
-        if (empty($this->getTxtMailTemplatePath())) {
-            throw new IncompleteConfigurationException(
-                'Key "plugin.tx_felogin_login.settings.email_htmlTemplatePath" cannot be empty!',
-                1562665945
-            );
-        }
-    }
-
-    protected function getSenderMailAddress(): string
-    {
-        return $this->getSettings()['email_from'] ?: $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailFromAddress'];
-    }
-
-    protected function getSenderName(): string
-    {
-        return $this->getSettings()['email_fromName'] ?: $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailFromName'];
-    }
-
-    protected function getHtmlMailTemplatePath(): string
-    {
-        return $this->getSettings()['email_htmlTemplatePath'];
-    }
-
-    protected function getTxtMailTemplatePath(): string
-    {
-        return $this->getSettings()['email_plainTemplatePath'];
-    }
-
-    protected function getReplyTo(): ?Address
-    {
-        $address = null;
-        $replyToAddress = $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailReplyToAddress'];
-
-        if (!empty($replyToAddress)) {
-            $replyToName = $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailReplyToName'];
-            if (empty($replyToName)) {
-                $address = new Address($replyToAddress);
-            } else {
-                $address = new NamedAddress($replyToAddress, $replyToName);
-            }
-        }
-
-        return $address;
-    }
-
-    /**
      * @param string $receiverName
      * @param string $emailAddress
      * @param string $hash
@@ -307,38 +328,20 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
         return new NamedAddress($this->getSenderMailAddress(), $this->getSenderName());
     }
 
-    /**
-     * @param string $hash
-     * @param string $passwordHash
-     */
-    public function updatePasswordAndInvalidateHash(string $hash, string $passwordHash): void
+    protected function getReplyTo(): ?Address
     {
-        $queryBuilder = $this->getQueryBuilder();
+        $address = null;
+        $replyToAddress = $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailReplyToAddress'];
 
-        $queryBuilder->update('fe_users')
-            ->set('password', $passwordHash)
-            ->set('felogin_forgotHash', '""', false)
-            ->set('tstamp', (int)$GLOBALS['EXEC_TIME'])
-            ->where(
-                $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash))
-            )
-            ->execute();
-    }
+        if (!empty($replyToAddress)) {
+            $replyToName = $GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailReplyToName'];
+            if (empty($replyToName)) {
+                $address = new Address($replyToAddress);
+            } else {
+                $address = new NamedAddress($replyToAddress, $replyToName);
+            }
+        }
 
-    /**
-     * @param string $hash
-     *
-     * @return bool
-     */
-    public function existsUserWithHash(string $hash): bool
-    {
-        $queryBuilder = $this->getQueryBuilder();
-        $predicates = $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash));
-
-        return (bool)$queryBuilder->count('uid')
-            ->from('fe_users')
-            ->where($predicates)
-            ->execute()
-            ->fetchColumn();
+        return $address;
     }
 }
