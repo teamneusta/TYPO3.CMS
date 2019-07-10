@@ -10,7 +10,6 @@
         <f:render partial="RenderLabelOrMessage" arguments="{key: '{messageKey}_message'}"/>
     </p>
 </f:if>
-
 <f:if condition="{onSubmit}">
     <f:then>
         <f:form target="_top" fieldNamePrefix="" action="login" onsubmit="{onSubmit}">
@@ -25,7 +24,9 @@
 </f:if>
 
 <f:if condition="{settings.showForgotPassword}">
-    <f:link.action action="recovery" controller="PasswordRecovery">Forgot your password?</f:link.action>
+    <f:link.action action="recovery" controller="PasswordRecovery">
+        <f:render partial="RenderLabelOrMessage" arguments="{key: 'forgot_header'}"/>
+    </f:link.action>
 </f:if>
 
 <f:section name="content">

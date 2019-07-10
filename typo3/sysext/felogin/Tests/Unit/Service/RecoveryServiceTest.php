@@ -35,9 +35,9 @@ class RecoveryServiceTest extends UnitTestCase
 
     protected function setUp(): void
     {
-        $this->subject = new RecoveryService();
-
         parent::setUp();
+
+        $this->subject = new RecoveryService();
     }
 
     /**
