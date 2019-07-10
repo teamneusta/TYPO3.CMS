@@ -141,6 +141,15 @@ For security reasons, this link is only active until %s. If you do not visit the
 			<trans-unit id="enter_your_data">
 				<source>Username or email address</source>
 			</trans-unit>
+			<trans-unit id="password_recovery_link_expired">
+				<source>Your password recovery link is expired.</source>
+			</trans-unit>
+			<trans-unit id="empty_password_and_password_repeat">
+				<source>New password and new password repeat cannot be empty</source>
+			</trans-unit>
+			<trans-unit id="password_must_match_repeated">
+				<source>New Password must match repeated password.</source>
+			</trans-unit>
 		</body>
 	</file>
 </xliff>

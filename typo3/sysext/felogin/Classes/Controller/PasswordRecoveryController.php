@@ -95,7 +95,7 @@ class PasswordRecoveryController extends ActionController
         //timestamp is expired or hash can not be assigned to a user
         if ($currentTimestamp > $timestamp || !$this->recoveryService->existsUserWithHash($hash)) {
             $result = $this->request->getOriginalRequestMappingResults();
-            $result->addError(new Error('Your password recovery link is expired.', 1554994253));
+            $result->addError(new Error($this->getTranslation('password_recovery_link_expired'), 1554994253));
             $this->request->setOriginalRequestMappingResults($result);
             $this->forward('recovery', 'PasswordRecovery', 'felogin');
         }
@@ -128,7 +128,10 @@ class PasswordRecoveryController extends ActionController
         $argumentsExist = $this->request->hasArgument('newPass') && $this->request->hasArgument('newPassRepeat');
         $argumentsEmpty = empty($this->request->getArgument('newPass')) || empty($this->request->getArgument('newPassRepeat'));
         if (!$argumentsExist || $argumentsEmpty) {
-            $originalResult->addError(new Error('New password and new password repeat cannot be empty', 1554971665));
+            $originalResult->addError(new Error(
+                $this->getTranslation('empty_password_and_password_repeat'),
+                1554971665
+            ));
             $this->request->setOriginalRequestMappingResults($originalResult);
             $this->forward(
                 'showChangePassword',
@@ -208,7 +211,7 @@ class PasswordRecoveryController extends ActionController
 
         //make sure the user entered the password twice
         if ($newPass !== $this->request->getArgument('newPassRepeat')) {
-            $originalResult->addError(new Error('New Password must match repeated password.', 1554912163));
+            $originalResult->addError(new Error($this->getTranslation('password_must_match_repeated'), 1554912163));
         }
 
         // Resolve validators from TypoScript configuration
