@@ -44,6 +44,7 @@ use TYPO3\CMS\Extbase\Validation\Validator\NotEmptyValidator;
 use TYPO3\CMS\Extbase\Validation\Validator\StringLengthValidator;
 use TYPO3\CMS\Felogin\Controller\PasswordRecoveryController;
 use TYPO3\CMS\Felogin\Service\RecoveryServiceInterface;
+use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
 use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
@@ -67,8 +68,11 @@ class PasswordRecoveryControllerTest extends UnitTestCase
             NotEmptyValidator::class,
             ['className' => StringLengthValidator::class, 'options' => ['minimum' => 6]],
         ],
-        'pages' => 123
+        'pages' => 123,
+        'recursive' => 1,
     ];
+
+    protected $storagePidList = '123';
 
     protected function setUp(): void
     {
@@ -297,7 +301,7 @@ class PasswordRecoveryControllerTest extends UnitTestCase
 
         $errors = $request->getOriginalRequestMappingResults()->getErrors();
 
-        self::assertEquals([new Error('New Password must match repeated password.', 1554912163)], $errors);
+        self::assertEquals([new Error('any translation', 1554912163)], $errors);
     }
 
     /**
@@ -326,6 +330,10 @@ class PasswordRecoveryControllerTest extends UnitTestCase
      */
     protected function mockFetchEmailFromUser(string $emailOrUsername, string $email = ''): void
     {
+        $treeUidListProvider = $this->prophesize(TreeUidListProvider::class);
+        $treeUidListProvider->getListForIdList($this->settings['pages'], $this->settings['recursive'])
+            ->willReturn($this->storagePidList);
+
         $expressionBuilder = $this->prophesize(ExpressionBuilder::class);
         $expressionBuilder->orX(Argument::any(), Argument::any())->shouldBeCalled();
         $expressionBuilder->eq('username', ':dc1')->shouldBeCalled();
@@ -349,6 +357,7 @@ class PasswordRecoveryControllerTest extends UnitTestCase
         $connectionPool = $this->prophesize(ConnectionPool::class);
         $connectionPool->getConnectionForTable('fe_users')->willReturn($connection->reveal());
 
+        GeneralUtility::addInstance(TreeUidListProvider::class, $treeUidListProvider->reveal());
         GeneralUtility::addInstance(ConnectionPool::class, $connectionPool->reveal());
     }
 

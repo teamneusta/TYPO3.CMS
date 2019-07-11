@@ -18,6 +18,8 @@ namespace TYPO3\CMS\Felogin\Tests\Unit\Service;
 
 use Doctrine\DBAL\Driver\Statement;
 use Prophecy\Argument;
+use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Core\Context\DateTimeAspect;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
@@ -28,6 +30,8 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 class RecoveryServiceTest extends UnitTestCase
 {
+    protected $resetSingletonInstances = true;
+
     /**
      * @var \TYPO3\CMS\Felogin\Service\RecoveryService
      */
@@ -83,6 +87,9 @@ class RecoveryServiceTest extends UnitTestCase
         $queryBuilder->update('fe_users')->willReturn($queryBuilder->reveal());
 
         $this->mockGetQueryBuilder($queryBuilder);
+
+        $context = new Context(['date' => new DateTimeAspect(new \DateTimeImmutable('@' . $GLOBALS['EXEC_TIME']))]);
+        GeneralUtility::setSingletonInstance(Context::class, $context);
 
         $this->subject->updatePasswordAndInvalidateHash('some hash', 'some hashed password');
     }
