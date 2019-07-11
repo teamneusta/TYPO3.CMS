@@ -26,6 +26,7 @@ use TYPO3\CMS\Extbase\Error\Result;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
 use TYPO3\CMS\Felogin\Service\RecoveryServiceInterface;
+use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
 use TYPO3\CMS\Felogin\Service\ValidatorResolverService;
 
 /**
@@ -183,6 +184,9 @@ class PasswordRecoveryController extends ActionController
      */
     protected function fetchEmailFromUser(string $emailOrUsername): string
     {
+        $storageProvider = $this->getTreeListUidProvider();
+        $storageList = $storageProvider->getListForIdList((string)$this->settings['pages'],
+            (int)$this->settings['recursive']);
         $queryBuilder = $this->getQueryBuilder();
 
         return (string)$queryBuilder->select('email')
@@ -193,7 +197,7 @@ class PasswordRecoveryController extends ActionController
                     $queryBuilder->expr()->eq('email', $queryBuilder->createNamedParameter($emailOrUsername))
                 ),
                 // respect storage pid
-                $queryBuilder->expr()->in('pid', $this->settings['pages'])
+                $queryBuilder->expr()->in('pid', $storageList)
             )
             ->execute()
             ->fetchColumn();
@@ -259,5 +263,16 @@ class PasswordRecoveryController extends ActionController
     protected function hasValidHash($hash): bool
     {
         return !empty($hash) && is_string($hash) && strpos($hash, '|') === 10;
+    }
+
+    /**
+     * @return TreeUidListProvider
+     */
+    protected function getTreeListUidProvider(): TreeUidListProvider
+    {
+        return GeneralUtility::makeInstance(
+            TreeUidListProvider::class,
+            $this->configurationManager->getContentObject()
+        );
     }
 }

@@ -22,6 +22,7 @@ use TYPO3\CMS\Core\Context\Exception\AspectNotFoundException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
+use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
 
 /**
  * Used for plugin login
@@ -46,7 +47,7 @@ class LoginController extends ActionController
         $this->view->assignMultiple(
             [
                 'messageKey' => $this->getStatusMessage($loginType, $isLoggedInd),
-                'storagePid' => $this->settings['pages'],
+                'storagePid' => $this->getStoragePid(),
                 'permaloginStatus' => $this->getPermaloginStatus()
             ]
         );
@@ -81,7 +82,7 @@ class LoginController extends ActionController
         $this->view->assignMultiple(
             [
                 'user' => $GLOBALS['TSFE']->fe_user->user ?? [],
-                'storagePid' => $this->settings['pages'],
+                'storagePid' => $this->getStoragePid(),
             ]
         );
     }
@@ -201,5 +202,17 @@ class LoginController extends ActionController
             $extraHidden = implode(LF, $extraHidden);
             $this->view->assign('extraHidden', $extraHidden);
         }
+    }
+
+    /**
+     * provides list of storage pids
+     *
+     * @return string
+     */
+    protected function getStoragePid(): string
+    {
+        $storageProvider = new TreeUidListProvider($this->configurationManager->getContentObject());
+
+        return $storageProvider->getListForIdList((string)$this->settings['pages'], (int)$this->settings['recursive']);
     }
 }
