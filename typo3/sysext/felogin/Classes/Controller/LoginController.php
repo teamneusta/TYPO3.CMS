@@ -73,6 +73,7 @@ class LoginController extends ActionController
         }
 
         if (($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT) && $this->redirectUrl && !$this->isRedirectDisabled()) {
+// Das geht nicht: isCookieSet hängt nicht am fe_user sondern an der fe_authentication...
             if (!$this->getFeUser()->isCookieSet() && $this->isUserLoggedIn()) {
                 $this->cookieWarning = true;
             }
@@ -87,8 +88,6 @@ class LoginController extends ActionController
         $this->handleLoginForwards();
 
         $this->redirectIfNecessary();
-
-        debug($this->isUserLoggedIn());
 
         $this->view->assignMultiple(
             [
