@@ -39,15 +39,15 @@ class LoginController extends ActionController
      */
     protected $redirectHandler;
 
-    public function injectRedirecter(RedirectHandler $RedirectHandler): void
+    public function injectRedirecter(RedirectHandler $redirectHandler): void
     {
-        $this->redirectHandler = $RedirectHandler;
+        $this->redirectHandler = $redirectHandler;
     }
 
     public function initializeAction(): void
     {
         // todo: cookie message instead of redirect
-        $this->redirectHandler->process($this->settings, $this->request);
+//        $this->redirectHandler->process($this->settings, $this->request);
     }
 
     /**
@@ -60,6 +60,13 @@ class LoginController extends ActionController
         //@todo: pivars redirectReferrer
         $loginType = (string)$this->getPropertyFromGetAndPost('logintype');
         $isLoggedInd = $this->isUserLoggedIn();
+
+        // set default baseUrl
+        $redirectUrl = $this->redirectHandler->getRedirectUrlRequestParam();
+        // overwrite with redirectUrl if redirect is not disabled. could be empty
+//        if(!$this->conf['redirectDisable'] && !$this->noRedirect) {
+//            $redirectUrl = $this->redirectHandler->getLoginRedirectUrl($this->settings);
+//        }
 
         $this->handleForwards($isLoggedInd, $loginType);
 
@@ -98,6 +105,14 @@ class LoginController extends ActionController
      */
     public function logoutAction(): void
     {
+        // todo: add alternative logout form redirect url
+        // set default baseUrl
+        $redirectUrl = $this->redirectHandler->getRedirectUrlRequestParam();
+        // overwrite with redirectUrl if redirect is not disabled. could be empty
+//        if(!$this->conf['redirectDisable'] && !$this->noRedirect) {
+//            $redirectUrl = $this->redirectHandler->getLogoutRedirectUrl($this->settings);
+//        }
+
         //@todo: noredirect params
         $this->view->assignMultiple(
             [
