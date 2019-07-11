@@ -8,9 +8,9 @@ plugin.tx_felogin_login {
     # E-Mail Settings
     email_from = {$styles.content.loginform.emailFrom}
     email_fromName = {$styles.content.loginform.emailFromName}
-    replyTo = {$styles.content.loginform.replyToEmail}
     email_htmlTemplatePath = {$styles.content.loginform.emailHtmlTemplatePath}
     email_plainTemplatePath = {$styles.content.loginform.emailPlainTemplatePath}
+    replyTo = {$styles.content.loginform.replyToEmail}
 
     # Security
     forgotLinkHashValidTime = {$styles.content.loginform.forgotLinkHashValidTime}
