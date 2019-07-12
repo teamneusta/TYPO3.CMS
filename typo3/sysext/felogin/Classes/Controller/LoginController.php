@@ -226,7 +226,7 @@ class LoginController extends ActionController
 
     protected function getSignalSlotDispatcher(): Dispatcher
     {
-        static $signalSlotDispatcher = null;
+        static $signalSlotDispatcher;
 
         if ($signalSlotDispatcher === null) {
             $signalSlotDispatcher = $this->objectManager->get(Dispatcher::class);
