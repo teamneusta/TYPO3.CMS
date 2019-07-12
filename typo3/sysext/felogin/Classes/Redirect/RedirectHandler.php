@@ -90,7 +90,7 @@ class RedirectHandler
         $this->request = $request;
         $this->userIsLoggedIn = $this->isUserLoggedIn();
 
-        return $this->processRedirect($this->extractRedirectModesFromSettings($settings));
+        return $this->processRedirect($this->extractRedirectModesFromSettings());
     }
 
     /**
@@ -123,7 +123,7 @@ class RedirectHandler
                             $redirectUrl = $this->handleRedirectMethodGroupLogin();
                             break;
                         case 'userLogin':
-                            $redirectUrl = $this->handRedirectMethodUserLogin();
+                            $redirectUrl = $this->handleRedirectMethodUserLogin();
                             break;
                         case 'login':
                             $redirectUrl = $this->handleRedirectMethodLogin(
@@ -148,7 +148,7 @@ class RedirectHandler
             }
 
             if ($redirectUrl !== '') {
-                $redirectUrlList[] = '';
+                $redirectUrlList[] = $redirectUrl;
             }
         }
 
@@ -320,7 +320,7 @@ class RedirectHandler
      *
      * @return string
      */
-    protected function handRedirectMethodUserLogin(): string
+    protected function handleRedirectMethodUserLogin(): string
     {
         $redirectUrl = '';
         $userTable = $this->feUser->user_table;
@@ -509,9 +509,9 @@ class RedirectHandler
         return in_array($method, $redirectMethods, true);
     }
 
-    protected function extractRedirectModesFromSettings(array $settings): array
+    protected function extractRedirectModesFromSettings(): array
     {
-        return GeneralUtility::trimExplode(',', $settings['redirectMode'] ?? '', true);
+        return GeneralUtility::trimExplode(',', $this->settings['redirectMode'] ?? '', true);
     }
 
     private function getTypo3Request(): ServerRequestInterface

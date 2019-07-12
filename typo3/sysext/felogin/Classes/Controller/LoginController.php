@@ -20,10 +20,11 @@ use TYPO3\CMS\Core\Authentication\LoginType;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Context\Exception\AspectNotFoundException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
+// use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
 use TYPO3\CMS\Felogin\Redirect\RedirectHandler;
+use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
 
 /**
  * Used for plugin login
@@ -39,6 +40,25 @@ class LoginController extends ActionController
      */
     protected $redirectHandler;
 
+    /**
+     * @var string
+     */
+    protected $redirectUrl;
+
+    /**
+     * @var string
+     */
+    protected $loginType;
+
+    /**
+     * @var bool
+     */
+    protected $cookieWarning = false;
+
+    /**
+     * @param RedirectHandler $RedirectHandler
+     */
+
     public function injectRedirecter(RedirectHandler $redirectHandler): void
     {
         $this->redirectHandler = $redirectHandler;
@@ -46,8 +66,18 @@ class LoginController extends ActionController
 
     public function initializeAction(): void
     {
-        // todo: cookie message instead of redirect
-//        $this->redirectHandler->process($this->settings, $this->request);
+        $this->loginType = (string)$this->getPropertyFromGetAndPost('logintype');
+
+        if (!$this->isRedirectDisabled()) {
+            $this->redirectUrl = $this->redirectHandler->process($this->settings, $this->request);
+        }
+
+        if (($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT) && $this->redirectUrl && !$this->isRedirectDisabled()) {
+// Das geht nicht: isCookieSet hängt nicht am fe_user sondern an der fe_authentication...
+            if (!$this->getFeUser()->isCookieSet() && $this->isUserLoggedIn()) {
+                $this->cookieWarning = true;
+            }
+        }
     }
 
     /**
@@ -55,28 +85,26 @@ class LoginController extends ActionController
      */
     public function loginAction(): void
     {
-        //@todo: noredirect params
-        //@todo: referer
-        //@todo: pivars redirectReferrer
-        $loginType = (string)$this->getPropertyFromGetAndPost('logintype');
-        $isLoggedInd = $this->isUserLoggedIn();
+        $this->handleLoginForwards();
 
-        // set default baseUrl
-        $redirectUrl = $this->redirectHandler->getRedirectUrlRequestParam();
-        // overwrite with redirectUrl if redirect is not disabled. could be empty
-//        if(!$this->conf['redirectDisable'] && !$this->noRedirect) {
-//            $redirectUrl = $this->redirectHandler->getLoginRedirectUrl($this->settings);
-//        }
-
-        $this->handleForwards($isLoggedInd, $loginType);
+        $this->redirectIfNecessary();
 
         $this->view->assignMultiple(
             [
-                'messageKey'       => $this->getStatusMessage($loginType, $isLoggedInd),
+                'messageKey'       => $this->getStatusMessage(),
                 'storagePid'       => $this->getStoragePid(),
-                'permaloginStatus' => $this->getPermaloginStatus()
+                'permaloginStatus' => $this->getPermaloginStatus(),
+                'redirectURL'      => $this->getLoginRedirectURL(),
+                'redirectReferrer' => $this->getRedirectReferrer(),
+                'noRedirect'       => $this->isRedirectDisabled(),
+                'cookieWarning'    => $this->cookieWarning
             ]
         );
+    }
+
+    protected function getRedirectReferrer():string
+    {
+        return $this->request->hasArgument('redirectReferrer') ? (string)$this->request->getArgument('redirectReferrer') : '';
     }
 
     /**
@@ -94,8 +122,9 @@ class LoginController extends ActionController
 
         $this->view->assignMultiple(
             [
-                'user'             => $GLOBALS['TSFE']->fe_user->user ?? [],
-                'showLoginMessage' => $showLoginMessage
+                'user'             => $this->getFeUser(),
+                'showLoginMessage' => $showLoginMessage,
+                'cookieWarning'    => $this->cookieWarning
             ]
         );
     }
@@ -105,19 +134,12 @@ class LoginController extends ActionController
      */
     public function logoutAction(): void
     {
-        // todo: add alternative logout form redirect url
-        // set default baseUrl
-        $redirectUrl = $this->redirectHandler->getRedirectUrlRequestParam();
-        // overwrite with redirectUrl if redirect is not disabled. could be empty
-//        if(!$this->conf['redirectDisable'] && !$this->noRedirect) {
-//            $redirectUrl = $this->redirectHandler->getLogoutRedirectUrl($this->settings);
-//        }
-
         //@todo: noredirect params
         $this->view->assignMultiple(
             [
-                'user'       => $GLOBALS['TSFE']->fe_user->user ?? [],
+                'user'       => $this->getFeUser(),
                 'storagePid' => $this->getStoragePid(),
+                'cookieWarning'    => $this->cookieWarning,
             ]
         );
     }
@@ -129,9 +151,13 @@ class LoginController extends ActionController
      */
     protected function getStoragePid(): string
     {
+        $storageProvider = new TreeUidListProvider($this->configurationManager->getContentObject());
+        return $storageProvider->getListForIdList((string)$this->settings['pages'], (int)$this->settings['recursive']);
+/*
         return (string)($this->configurationManager->getConfiguration(
                 ConfigurationManagerInterface::CONFIGURATION_TYPE_FRAMEWORK
             )['persistence']['storagePid'] ?? '');
+*/
     }
 
     /**
@@ -149,19 +175,17 @@ class LoginController extends ActionController
     }
 
     /**
-     * handle forwards to overview and logout actions
+     * handle forwards to overview and logout actions from login action
      *
-     * @param bool $userLoggedIn
-     * @param string $loginType
      * @throws StopActionException
      */
-    protected function handleForwards(bool $userLoggedIn, string $loginType): void
+    protected function handleLoginForwards(): void
     {
-        if ($this->shouldRedirectToOverview($userLoggedIn, $loginType === LoginType::LOGIN)) {
+        if ($this->shouldRedirectToOverview()) {
             $this->forward('overview', null, null, ['showLoginMessage' => true]);
         }
 
-        if ($userLoggedIn) {
+        if ($this->isUserLoggedIn()) {
             $this->forward('logout');
         }
     }
@@ -176,6 +200,17 @@ class LoginController extends ActionController
     {
         return (bool)GeneralUtility::makeInstance(Context::class)
             ->getPropertyFromAspect('frontend.user', 'isLoggedIn');
+    }
+
+
+    /**
+     * Get RedirURL for Login Form from GP vars
+     *
+     * @return string
+     */
+    protected function getLoginRedirectURL():string
+    {
+        return (string)$this->getPropertyFromGetAndPost('redirect_url');
     }
 
     /**
@@ -199,31 +234,50 @@ class LoginController extends ActionController
     /**
      * redirect to overview on login successful and setting showLogoutFormAfterLogin disabled
      *
-     * @param bool $userLoggedIn
-     * @param bool $isLoginTypeLogin
      * @return bool
      */
-    protected function shouldRedirectToOverview(bool $userLoggedIn, bool $isLoginTypeLogin): bool
+    protected function shouldRedirectToOverview(): bool
     {
-        return $userLoggedIn && $isLoginTypeLogin && !($this->settings['showLogoutFormAfterLogin'] ?? 0);
+        return $this->isUserLoggedIn() && ($this->loginType === LoginType::LOGIN) && !($this->settings['showLogoutFormAfterLogin'] ?? 0);
     }
 
     /**
      * return message key based on user login status
      *
-     * @param string $loginType
-     * @param bool $isLoggedInd
      * @return string
      */
-    protected function getStatusMessage(string $loginType, bool $isLoggedInd): string
+    protected function getStatusMessage(): string
     {
         $messageKey = self::MESSAGEKEY_DEFAULT;
-        if ($loginType === LoginType::LOGIN && !$isLoggedInd) {
+        if ($this->loginType === LoginType::LOGIN && !$this->isUserLoggedIn()) {
             $messageKey = self::MESSAGEKEY_ERROR;
-        } elseif ($loginType === LoginType::LOGOUT) {
+        } elseif ($this->loginType === LoginType::LOGOUT) {
             $messageKey = self::MESSAGEKEY_LOGOUT;
         }
 
         return $messageKey;
     }
+
+    protected function redirectIfNecessary():void
+    {
+        if ($this->redirectUrl === '') {
+            return;
+        }
+        //@ToDo: Do the redirect. Really ;-)
+        die('Leite weiter zu ' . $this->redirectUrl);
+    }
+
+    protected function getFeUser() {
+        return $GLOBALS['TSFE']->fe_user->user ?? [];
+    }
+
+    /**
+     * Should this controller make use of possibly configured redirects at all?
+     * @return bool
+     */
+    public function isRedirectDisabled():bool
+    {
+        return $this->request->hasArgument('noredirect') || $this->settings['noredirect'] || $this->settings['redirectDisable'];
+    }
+
 }
