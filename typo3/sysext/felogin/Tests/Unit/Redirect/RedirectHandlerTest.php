@@ -84,8 +84,7 @@ class RedirectHandlerTest extends UnitTestCase
         $GLOBALS['TSFE'] = $this->prophesize(TypoScriptFrontendController::class)->reveal();
         $GLOBALS['TYPO3_REQUEST'] = $this->typo3Request->reveal();
 
-        $this->subject = new RedirectHandler();
-        $this->subject->injectUriBuilder($this->uriBuilder->reveal());
+        $this->subject = new RedirectHandler($this->uriBuilder->reveal());
     }
 
     protected function tearDown(): void
@@ -105,7 +104,9 @@ class RedirectHandlerTest extends UnitTestCase
         $this->setLoginType(LoginType::LOGOUT);
         $request = $this->prophesize(Request::class);
 
-        self::assertEquals($expect, $this->subject->process($settings, $request->reveal()));
+        $this->subject->init($settings, $request->reveal());
+
+        self::assertEquals($expect, $this->subject->processRedirect());
     }
 
     public function loginTypeLogoutDataProvider(): Generator
@@ -149,7 +150,9 @@ class RedirectHandlerTest extends UnitTestCase
             ->isValid(Argument::type('string'))
             ->willReturn(true);
 
-        self::assertEquals($expected, $this->subject->getLogoutRedirectUrl($settings));
+        $this->subject->init($settings, $this->prophesize(Request::class)->reveal());
+
+        self::assertEquals($expected, $this->subject->getLogoutRedirectUrl());
     }
 
     public function getLogoutRedirectUrlDataProvider(): Generator
@@ -206,7 +209,9 @@ class RedirectHandlerTest extends UnitTestCase
         $this->uriBuilder->setTargetPageUid(10)->shouldBeCalled();
         $this->uriBuilder->build()->willReturn('https://valid.url/');
 
-        self::assertEquals('https://valid.url/', $this->subject->getLogoutRedirectUrl($settings));
+        $this->subject->init($settings, $this->prophesize(Request::class)->reveal());
+
+        self::assertEquals('https://valid.url/', $this->subject->getLogoutRedirectUrl());
     }
 
     /**
@@ -234,7 +239,9 @@ class RedirectHandlerTest extends UnitTestCase
             ->isValid(Argument::type('string'))
             ->willReturn(true);
 
-        self::assertEquals($expected, $this->subject->getLoginRedirectUrl($settings));
+        $this->subject->init($settings, $this->prophesize(Request::class)->reveal());
+
+        self::assertEquals($expected, $this->subject->getLoginRedirectUrl());
     }
 
     public function getLoginRedirectUrlDataProvider(): Generator
@@ -273,7 +280,9 @@ class RedirectHandlerTest extends UnitTestCase
         $this->uriBuilder->setLinkAccessRestrictedPages(true)->shouldBeCalled();
         $this->uriBuilder->build()->willReturn('https://valid.url/');
 
-        self::assertEquals('https://valid.url/', $this->subject->getLoginRedirectUrl($settings));
+        $this->subject->init($settings, $this->prophesize(Request::class)->reveal());
+
+        self::assertEquals('https://valid.url/', $this->subject->getLoginRedirectUrl());
     }
 
     protected function setLoginType(string $loginType = LoginType::LOGIN): void

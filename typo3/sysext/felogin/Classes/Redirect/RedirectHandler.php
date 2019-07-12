@@ -72,6 +72,11 @@ class RedirectHandler
      */
     protected $uriBuilder;
 
+    /**
+     * @var array
+     */
+    protected $redirectModes = [];
+
     public function __construct(UriBuilder $uriBuilder)
     {
         $this->uriBuilder = $uriBuilder;
@@ -82,68 +87,50 @@ class RedirectHandler
         );
     }
 
-    public function process(array $settings, Request $request)
+    /**
+     * initialize handler
+     *
+     * @param array $settings
+     * @param Request $request
+     */
+    public function init(array $settings, Request $request): void
     {
         $this->loginType = (string)$this->getPropertyFromGetAndPost('logintype');
         $this->feUser = $GLOBALS['TSFE']->fe_user;
         $this->settings = $settings;
         $this->request = $request;
         $this->userIsLoggedIn = $this->isUserLoggedIn();
-
-        return $this->processRedirect($this->extractRedirectModesFromSettings());
+        $this->redirectModes = $this->extractRedirectModesFromSettings();
     }
 
     /**
      * Process redirect methods. The function searches for a redirect url using all configured methods.
      *
-     * @param array $redirectMethods
      * @return string Redirect URL
      */
-    protected function processRedirect(array $redirectMethods): string
+    public function processRedirect(): string
     {
         $isLoginTypeLogin = $this->loginType === LoginType::LOGIN;
 
         if (
             $isLoginTypeLogin
             && $this->userIsLoggedIn === false
-            && $this->isRedirectMethodActive($redirectMethods, 'loginError')
+            && $this->isRedirectMethodActive('loginError')
         ) {
             return $this->handleRedirectMethodLoginError();
         }
 
         $redirectUrlList = [];
-        foreach ($redirectMethods as $redirMethod) {
+        foreach ($this->redirectModes as $redirMethod) {
             $redirectUrl = '';
 
             if ($isLoginTypeLogin) {
-                if ($this->userIsLoggedIn) {
-                    // Logintype is needed because the login-page wouldn't be accessible anymore after a login (would always redirect)
-                    switch ($redirMethod) {
-                        case 'groupLogin':
-                            $redirectUrl = $this->handleRedirectMethodGroupLogin();
-                            break;
-                        case 'userLogin':
-                            $redirectUrl = $this->handleRedirectMethodUserLogin();
-                            break;
-                        case 'login':
-                            $redirectUrl = $this->handleRedirectMethodLogin(
-                                (int)($this->settings['redirectPageLogin'] ?? 0)
-                            );
-                            break;
-                        case 'getpost':
-                            $redirectUrl = $this->getRedirectUrlRequestParam();
-                            break;
-                        case 'referer':
-                            $redirectUrl = $this->handleRedirectMethodReferer();
-                            break;
-                        case 'refererDomains':
-                            $redirectUrl = $this->handleRedirectMethodRefererDomains();
-                            break;
-                    }
-                }
+                $redirectUrl = $this->handleSuccessfulLogin($redirMethod);
             } elseif ($this->loginType === LoginType::LOGOUT) {
                 // TODO: after logout signal for general actions after after logout has been confirmed
-                $redirectUrl = $this->handleRedirectMethodLogout($redirMethod === 'logout', (int)($this->settings['redirectPageLogout'] ?? 0)
+                $redirectUrl = $this->handleRedirectMethodLogout(
+                    $redirMethod === 'logout',
+                    (int)($this->settings['redirectPageLogout'] ?? 0)
                 );
             }
 
@@ -158,15 +145,13 @@ class RedirectHandler
     /**
      * get alternative logout form redirect url if logout and page not accessible
      *
-     * @param array $settings
      * @return string
      */
-    public function getLogoutRedirectUrl(array $settings): string
+    public function getLogoutRedirectUrl(): string
     {
-        $redirectModes = $this->extractRedirectModesFromSettings($settings);
-        $redirectUrl = $this->getGetpostRedirectUrl($redirectModes);
-        $redirectPageLogout = (int)($settings['redirectPageLogout'] ?? 0);
-        $isRedirectModeLogoutActive = $this->isRedirectMethodActive($redirectModes, 'logout');
+        $redirectUrl = $this->getGetpostRedirectUrl();
+        $redirectPageLogout = (int)($this->settings['redirectPageLogout'] ?? 0);
+        $isRedirectModeLogoutActive = $this->isRedirectMethodActive('logout');
 
         if ($redirectPageLogout && $isRedirectModeLogoutActive && $this->isUserLoggedIn()) {
             $redirectUrl = $this->generateUri($redirectPageLogout);
@@ -178,15 +163,13 @@ class RedirectHandler
     /**
      * get alternative login form redirect url
      *
-     * @param array $settings
      * @return string
      */
-    public function getLoginRedirectUrl(array $settings): string
+    public function getLoginRedirectUrl(): string
     {
-        $redirectModes = $this->extractRedirectModesFromSettings($settings);
-        $redirectUrl = $this->getGetpostRedirectUrl($redirectModes);
-        $redirectPageLogin = (int)($settings['redirectPageLogin'] ?? 0);
-        $isRedirectModeLogoutActive = $this->isRedirectMethodActive($redirectModes, 'login');
+        $redirectUrl = $this->getGetpostRedirectUrl();
+        $redirectPageLogin = (int)($this->settings['redirectPageLogin'] ?? 0);
+        $isRedirectModeLogoutActive = $this->isRedirectMethodActive('login');
 
         if ($redirectPageLogin && $isRedirectModeLogoutActive) {
             $redirectUrl = $this->generateUriWihtRestrictedPages($redirectPageLogin);
@@ -200,12 +183,11 @@ class RedirectHandler
      * Placeholder for maybe future options
      * Preserve the get/post value
      *
-     * @param array $redirectModes
      * @return string
      */
-    protected function getGetpostRedirectUrl(array $redirectModes): string
+    protected function getGetpostRedirectUrl(): string
     {
-        return $this->isRedirectMethodActive($redirectModes, 'getpost')
+        return $this->isRedirectMethodActive('getpost')
             ? $this->getRedirectUrlRequestParam()
             : '';
     }
@@ -504,9 +486,9 @@ class RedirectHandler
         return $request->getParsedBody()[$propertyName] ?? $request->getQueryParams()[$propertyName] ?? null;
     }
 
-    protected function isRedirectMethodActive(array $redirectMethods, string $method): bool
+    protected function isRedirectMethodActive(string $method): bool
     {
-        return in_array($method, $redirectMethods, true);
+        return in_array($method, $this->redirectModes, true);
     }
 
     protected function extractRedirectModesFromSettings(): array
@@ -518,5 +500,46 @@ class RedirectHandler
     {
         // todo: refactor when extbase handles PSR-15 requests
         return $GLOBALS['TYPO3_REQUEST'];
+    }
+
+    /**
+     * generate redirect_url for case that the user was successfuly logged in
+     *
+     * @param $redirMethod
+     * @return string
+     */
+    protected function handleSuccessfulLogin($redirMethod): string
+    {
+        if ($this->userIsLoggedIn) {
+            return '';
+        }
+
+        // Logintype is needed because the login-page wouldn't be accessible anymore after a login (would always redirect)
+        switch ($redirMethod) {
+            case 'groupLogin':
+                $redirectUrl = $this->handleRedirectMethodGroupLogin();
+                break;
+            case 'userLogin':
+                $redirectUrl = $this->handleRedirectMethodUserLogin();
+                break;
+            case 'login':
+                $redirectUrl = $this->handleRedirectMethodLogin(
+                    (int)($this->settings['redirectPageLogin'] ?? 0)
+                );
+                break;
+            case 'getpost':
+                $redirectUrl = $this->getRedirectUrlRequestParam();
+                break;
+            case 'referer':
+                $redirectUrl = $this->handleRedirectMethodReferer();
+                break;
+            case 'refererDomains':
+                $redirectUrl = $this->handleRedirectMethodRefererDomains();
+                break;
+            default:
+                $redirectUrl = '';
+        }
+
+        return $redirectUrl;
     }
 }

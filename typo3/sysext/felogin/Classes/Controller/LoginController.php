@@ -61,10 +61,12 @@ class LoginController extends ActionController
 
     public function initializeAction(): void
     {
+        $this->redirectHandler->init($this->settings, $this->request);
+
         $this->loginType = (string)$this->getPropertyFromGetAndPost('logintype');
 
         if (!$this->isRedirectDisabled()) {
-            $this->redirectUrl = $this->redirectHandler->process($this->settings, $this->request);
+            $this->redirectUrl = $this->redirectHandler->processRedirect();
         }
 
         if (($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT) && $this->redirectUrl && !$this->isRedirectDisabled()) {
