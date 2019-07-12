@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace TYPO3\CMS\Felogin\Tests\Unit\Controller;
 
@@ -62,22 +62,6 @@ class LoginControllerTest extends UnitTestCase
      */
     protected $request;
 
-    protected function setUp(): void
-    {
-        $this->view = $this->prophesize(ViewInterface::class);
-        $this->configurationManager = $this->prophesize(ConfigurationManagerInterface::class);
-        $this->request = $this->prophesize(ServerRequestInterface::class);
-        $this->subject = new LoginController();
-
-        $GLOBALS['TSFE'] = $this->prophesize(TypoScriptFrontendController::class)->reveal();
-        $GLOBALS['TYPO3_REQUEST'] = $this->request->reveal();
-
-        $this->subject->injectConfigurationManager($this->configurationManager->reveal());
-        $this->inject($this->subject, 'view', $this->view->reveal());
-
-        parent::setUp();
-    }
-
     /**
      * @test
      */
@@ -85,27 +69,19 @@ class LoginControllerTest extends UnitTestCase
     {
         $this->setUserLoggedIn(false);
 
-        $this->configurationManager
-            ->getConfiguration(
-                ConfigurationManagerInterface::CONFIGURATION_TYPE_FRAMEWORK
-            )
-            ->willReturn(
-                [
-                    'persistence' => [
-                        'storagePid' => '1,2,3'
-                    ]
-                ]
-            );
-
-        $this->view
-            ->assignMultiple(
-                Argument::withEntry(
-                    'storagePid', '1,2,3'
-                )
-            )
-            ->shouldBeCalled();
+        $this->inject($this->subject, 'settings', ['pages' => '1,2,3']);
+        $this->view->assignMultiple(Argument::withEntry('storagePid', '1,2,3'))->shouldBeCalled();
 
         $this->subject->loginAction();
+    }
+
+    protected function setUserLoggedIn(bool $userLoggedIn): void
+    {
+        $userAspect = $this->prophesize(UserAspect::class);
+        $userAspect
+            ->get('isLoggedIn')
+            ->willReturn($userLoggedIn);
+        GeneralUtility::makeInstance(Context::class)->setAspect('frontend.user', $userAspect->reveal());
     }
 
     /**
@@ -119,6 +95,20 @@ class LoginControllerTest extends UnitTestCase
     }
 
     /**
+     * @param string $messageKey
+     */
+    protected function assertMessageKey(string $messageKey): void
+    {
+        $this->view
+            ->assignMultiple(
+                Argument::withEntry(
+                    'messageKey', $messageKey
+                )
+            )
+            ->shouldBeCalled();
+    }
+
+    /**
      * @test
      */
     public function loginActionShouldAssingLoginFailedToViewOnNotLoggedInUser(): void
@@ -129,6 +119,17 @@ class LoginControllerTest extends UnitTestCase
         $this->assertMessageKey(LoginController::MESSAGEKEY_ERROR);
 
         $this->subject->loginAction();
+    }
+
+    protected function setLoginType(string $loginType = LoginType::LOGIN): void
+    {
+        $this->request
+            ->getParsedBody()
+            ->willReturn(
+                [
+                    'logintype' => $loginType,
+                ]
+            );
     }
 
     /**
@@ -161,6 +162,21 @@ class LoginControllerTest extends UnitTestCase
         $this->expectExceptionMessage('forward');
 
         $this->subject->loginAction();
+    }
+
+    protected function injectRequestForControllerAction(string $controllerActionName): ObjectProphecy
+    {
+        $webRequest = $this->prophesize(Request::class);
+        $webRequest
+            ->setDispatched(false)
+            ->shouldBeCalled();
+        $webRequest
+            ->setControllerActionName($controllerActionName)
+            ->shouldBeCalled();
+
+        $this->inject($this->subject, 'request', $webRequest->reveal());
+
+        return $webRequest;
     }
 
     /**
@@ -197,20 +213,18 @@ class LoginControllerTest extends UnitTestCase
      * @test
      * @dataProvider permaloginStatusDataProvider
      */
-    public function permaloginStatusShouldAddCorrectPermaloginStatus(int $expected, int $conf, int $settings, int $lifetime): void
-    {
+    public function permaloginStatusShouldAddCorrectPermaloginStatus(
+        int $expected,
+        int $conf,
+        int $settings,
+        int $lifetime
+    ): void {
         $GLOBALS['TYPO3_CONF_VARS']['FE']['permalogin'] = $conf;
         $GLOBALS['TYPO3_CONF_VARS']['FE']['lifetime'] = $lifetime;
 
-        $this->inject($this->subject, 'settings', ['showPermaLogin' => $settings]);
+        $this->inject($this->subject, 'settings', ['showPermaLogin' => $settings, 'pages' => '1,2,3']);
 
-        $this->view
-            ->assignMultiple(
-                Argument::withEntry(
-                    'permaloginStatus', $expected
-                )
-            )
-            ->shouldBeCalled();
+        $this->view->assignMultiple(Argument::withEntry('permaloginStatus', $expected))->shouldBeCalled();
 
         $this->subject->loginAction();
     }
@@ -218,11 +232,11 @@ class LoginControllerTest extends UnitTestCase
     public function permaloginStatusDataProvider(): \Generator
     {
         yield '-1 => lifetime = 0' => [-1, 1, 1, 0];
-        yield '-1 => setting = 0' => [-1, 1, 0, 60*60];
-        yield '-1 => TYPO3_CONF_VARS -1, settings = 0' => [-1, -1, 1, 60*60];
-        yield '0 => TYPO3_CONF_VARS 0, setting = 1' => [0, 0, 1, 60*60];
-        yield '1 => TYPO3_CONF_VARS 1, setting = 1' => [1, 1, 1, 60*60];
-        yield '-1 => TYPO3_CONF_VARS 2, setting = 1' => [-1, 2, 1, 60*60];
+        yield '-1 => setting = 0' => [-1, 1, 0, 60 * 60];
+        yield '-1 => TYPO3_CONF_VARS -1, settings = 0' => [-1, -1, 1, 60 * 60];
+        yield '0 => TYPO3_CONF_VARS 0, setting = 1' => [0, 0, 1, 60 * 60];
+        yield '1 => TYPO3_CONF_VARS 1, setting = 1' => [1, 1, 1, 60 * 60];
+        yield '-1 => TYPO3_CONF_VARS 2, setting = 1' => [-1, 2, 1, 60 * 60];
     }
 
     /**
@@ -239,8 +253,8 @@ class LoginControllerTest extends UnitTestCase
 
         $this->view->assignMultiple(
             [
-                'user'         => ['username' => 'foo'],
-                'loginMessage' => true
+                'user' => ['username' => 'foo'],
+                'loginMessage' => true,
             ]
         );
 
@@ -262,52 +276,19 @@ class LoginControllerTest extends UnitTestCase
         $this->subject->overviewAction();
     }
 
-    protected function setLoginType(string $loginType = LoginType::LOGIN): void
+    protected function setUp(): void
     {
-        $this->request
-            ->getParsedBody()
-            ->willReturn(
-                [
-                    'logintype' => $loginType
-                ]
-            );
-    }
+        $this->view = $this->prophesize(ViewInterface::class);
+        $this->configurationManager = $this->prophesize(ConfigurationManagerInterface::class);
+        $this->request = $this->prophesize(ServerRequestInterface::class);
+        $this->subject = new LoginController();
 
-    protected function setUserLoggedIn(bool $userLoggedIn): void
-    {
-        $userAspect = $this->prophesize(UserAspect::class);
-        $userAspect
-            ->get('isLoggedIn')
-            ->willReturn($userLoggedIn);
-        GeneralUtility::makeInstance(Context::class)->setAspect('frontend.user', $userAspect->reveal());
-    }
+        $GLOBALS['TSFE'] = $this->prophesize(TypoScriptFrontendController::class)->reveal();
+        $GLOBALS['TYPO3_REQUEST'] = $this->request->reveal();
 
-    /**
-     * @param string $messageKey
-     */
-    protected function assertMessageKey(string $messageKey): void
-    {
-        $this->view
-            ->assignMultiple(
-                Argument::withEntry(
-                    'messageKey', $messageKey
-                )
-            )
-            ->shouldBeCalled();
-    }
+        $this->subject->injectConfigurationManager($this->configurationManager->reveal());
+        $this->inject($this->subject, 'view', $this->view->reveal());
 
-    protected function injectRequestForControllerAction(string $controllerActionName): ObjectProphecy
-    {
-        $webRequest = $this->prophesize(Request::class);
-        $webRequest
-            ->setDispatched(false)
-            ->shouldBeCalled();
-        $webRequest
-            ->setControllerActionName($controllerActionName)
-            ->shouldBeCalled();
-
-        $this->inject($this->subject, 'request', $webRequest->reveal());
-
-        return $webRequest;
+        parent::setUp();
     }
 }

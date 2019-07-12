@@ -75,5 +75,18 @@ defined('TYPO3_MODE') or die();
                 rowDescription,
             --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
         ';
+    } else {
+        \TYPO3\CMS\Extbase\Utility\ExtensionUtility::registerPlugin(
+            'TYPO3.CMS.Felogin',
+            'Login',
+            'Login: Login Form'
+        );
+
+        // Add the FlexForm
+        \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPiFlexFormValue(
+            '*',
+            'FILE:EXT:felogin/Configuration/FlexForms/Login.xml',
+            'felogin_login'
+        );
     }
 })();

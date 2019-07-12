@@ -1,5 +1,7 @@
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
 
+<f:flashMessages/>
+
 <f:if condition="{messageKey}">
     <h3>
         <f:render partial="RenderLabelOrMessage" arguments="{key: '{messageKey}_header'}"/>
@@ -8,7 +10,6 @@
         <f:render partial="RenderLabelOrMessage" arguments="{key: '{messageKey}_message'}"/>
     </p>
 </f:if>
-
 <f:if condition="{onSubmit}">
     <f:then>
         <f:form target="_top" fieldNamePrefix="" action="login" onsubmit="{onSubmit}">
@@ -20,6 +21,12 @@
             <f:render section="content" arguments="{_all}"/>
         </f:form>
     </f:else>
+</f:if>
+
+<f:if condition="{settings.showForgotPassword}">
+    <f:link.action action="recovery" controller="PasswordRecovery">
+        <f:render partial="RenderLabelOrMessage" arguments="{key: 'forgot_header'}"/>
+    </f:link.action>
 </f:if>
 
 <f:section name="content">
