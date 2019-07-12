@@ -36,14 +36,6 @@ class TreeUidListProviderTest extends UnitTestCase
      */
     protected $subject;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->cObj = $this->prophesize(ContentObjectRenderer::class);
-        $this->subject = new TreeUidListProvider($this->cObj->reveal());
-    }
-
     /**
      * @test
      */
@@ -81,5 +73,13 @@ class TreeUidListProviderTest extends UnitTestCase
         $this->cObj->getTreeList(Argument::any(), 2)->willReturn(...$treeLists);
 
         static::assertSame($expected, $this->subject->getListForIdList($uidList, 2));
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->cObj = $this->prophesize(ContentObjectRenderer::class);
+        $this->subject = new TreeUidListProvider($this->cObj->reveal());
     }
 }

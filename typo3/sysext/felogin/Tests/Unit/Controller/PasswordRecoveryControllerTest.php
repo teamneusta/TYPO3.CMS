@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace TYPO3\CMS\Felogin\Tests\Unit\Controller;
 
@@ -74,13 +74,6 @@ class PasswordRecoveryControllerTest extends UnitTestCase
 
     protected $storagePidList = '123';
 
-    protected function setUp(): void
-    {
-        $this->subject = $this->getAccessibleMock(PasswordRecoveryController::class, ['getTranslation']);
-
-        $this->subject->method('getTranslation')->willReturn('any translation');
-    }
-
     /**
      * @test
      */
@@ -106,6 +99,50 @@ class PasswordRecoveryControllerTest extends UnitTestCase
         $this->subject->changePasswordAction($newPassword, $hash);
 
         $recoveryService->updatePasswordAndInvalidateHash($hash, $passwordHash)->shouldHaveBeenCalled();
+    }
+
+    protected function mockRedirect(
+        $actionName,
+        $controllerName = '',
+        $arguments = null,
+        $extensionName = 'felogin',
+        $pageUid = null
+    ): void {
+        $contentObject = $this->prophesize(ContentObjectRenderer::class);
+        $contentObject->getUserObjectType()->willReturn('foo');
+
+        $configurationManager = $this->prophesize(ConfigurationManager::class);
+        $configurationManager->getConfiguration(ConfigurationManagerInterface::CONFIGURATION_TYPE_SETTINGS)->willReturn($this->settings);
+        $configurationManager->getContentObject()->willReturn($contentObject->reveal());
+
+        $this->subject->injectConfigurationManager($configurationManager->reveal());
+
+        $response = $this->prophesize(Response::class);
+        $response->setHeader(Argument::any(), Argument::any())->shouldBeCalled();
+        $response->setStatus(303)->shouldBeCalled();
+        $response->setContent(Argument::any())->shouldBeCalled();
+        $this->inject($this->subject, 'response', $response->reveal());
+
+        $cacheService = $this->prophesize(CacheService::class);
+        $cacheService->clearCachesOfRegisteredPageIds()->shouldBeCalled();
+
+        $objectManager = $this->prophesize(ObjectManager::class);
+        $objectManager->get(Arguments::class)->willReturn(new Arguments());
+        $objectManager->get(CacheService::class)->willReturn($cacheService->reveal());
+
+        $this->subject->injectObjectManager($objectManager->reveal());
+
+        $request = $this->prophesize(Request::class);
+        $this->inject($this->subject, 'request', $request->reveal());
+
+        $uriBuilder = $this->prophesize(UriBuilder::class);
+        $uriBuilder->uriFor($actionName, null, $controllerName, $extensionName)->shouldBeCalled();
+        $uriBuilder->setCreateAbsoluteUri(true)->shouldBeCalled();
+        $uriBuilder->setTargetPageUid($pageUid)->willReturn($uriBuilder->reveal());
+        $uriBuilder->reset()->willReturn($uriBuilder->reveal());
+        $this->inject($this->subject, 'uriBuilder', $uriBuilder->reveal());
+
+        $this->expectException(StopActionException::class);
     }
 
     /**
@@ -165,6 +202,30 @@ class PasswordRecoveryControllerTest extends UnitTestCase
     }
 
     /**
+     * @param \Prophecy\Prophecy\ObjectProphecy $request
+     * @param string $actionName
+     * @param string $controllerName
+     * @param array|null $arguments
+     */
+    protected function mockForward(
+        ObjectProphecy $request,
+        string $actionName = 'recovery',
+        string $controllerName = 'PasswordRecovery',
+        array $arguments = null
+    ): void {
+        $this->expectException(StopActionException::class);
+
+        $request->setDispatched(false)->shouldBeCalled();
+        $request->setControllerActionName($actionName)->shouldBeCalled();
+        $request->setControllerName($controllerName)->shouldBeCalled();
+        $request->setControllerExtensionName('felogin')->shouldBeCalled();
+
+        if ($arguments) {
+            $request->setArguments($arguments)->shouldBeCalled();
+        }
+    }
+
+    /**
      * @test
      */
     public function initializeShowChangePasswordActionShouldNotStopWorkflowIfValidHashIsPassedAndUserExists(): void
@@ -208,120 +269,6 @@ class PasswordRecoveryControllerTest extends UnitTestCase
         $this->subject->recoveryAction($emailOrUsername);
 
         $recoveryService->sendRecoveryEmail()->shouldNotHaveBeenCalled();
-    }
-
-    /**
-     * @test
-     */
-    public function recoveryActionShouldTryToFetchEmailFromUserAndSendMailIfEmailIsFound(): void
-    {
-        $emailOrUsername = 'mycoolusername';
-        $email = 'my@coolemail.com';
-
-        $this->mockFetchEmailFromUser($emailOrUsername, $email);
-        $this->mockAddFlashMessage();
-        $this->mockRedirect('login', 'Login');
-
-        $recoveryService = $this->prophesize(RecoveryServiceInterface::class);
-        $this->subject->injectRecoveryService($recoveryService->reveal());
-        $this->subject->recoveryAction($emailOrUsername);
-
-        $recoveryService->sendRecoveryEmail($email)->shouldHaveBeenCalled();
-    }
-
-    public function invalidHashDataProvider(): array
-    {
-        return [
-            'no hash parameter' => [
-                'hash' => null
-            ],
-            'empty hash parameter' => [
-                'hash' => ''
-            ],
-            'hash is an int' => [
-                'hash' => 1337
-            ],
-            'hash is an array' => [
-                'hash' => ['foo']
-            ],
-            'hash is a boolean' => [
-                'hash' => false
-            ],
-            'hash does not contain a "pipe"' => [
-                'hash' => 'some hash without a pipe'
-            ]
-        ];
-    }
-
-    /**
-     * @test
-     */
-    public function initializeChangePasswordActionShouldExitEarlyIfNewPasswordOrPasswordRepeatIsNotSet(): void
-    {
-        $result = $this->prophesize(Result::class);
-
-        $request = $this->prophesize(Request::class);
-        $request->getOriginalRequestMappingResults()->willReturn($result->reveal());
-        $request->hasArgument('newPass')->willReturn(true);
-        $request->hasArgument('newPassRepeat')->willReturn(false);
-
-        $request->getArgument('newPass')->willReturn('');
-        $request->getArgument('newPassRepeat')->willReturn(null);
-        $request->setOriginalRequestMappingResults($result->reveal())->shouldBeCalled();
-        $request->getArgument('hash')->willReturn('hash');
-
-        $this->mockForward($request, 'showChangePassword', 'PasswordRecovery', ['hash' => 'hash']);
-
-        $this->inject($this->subject, 'request', $request->reveal());
-        $this->subject->initializeChangePasswordAction();
-    }
-
-    /**
-     * @test
-     */
-    public function initializeChangePasswordActionShouldValidateNewPasswordAndForwardOnError(): void
-    {
-        $result = new Result();
-        $request = new Request();
-        $request->setOriginalRequestMappingResults($result);
-        $request->setArguments([
-            'hash' => 'some hash',
-            'newPass' => 'new password',
-            'newPassRepeat' => 'new password repeated'
-        ]);
-
-        $this->inject($this->subject, 'request', $request);
-        $this->inject($this->subject, 'settings', $this->settings);
-
-        try {
-            $this->subject->initializeChangePasswordAction();
-            $this->fail();
-        } catch (StopActionException $e) {
-        }
-
-        $errors = $request->getOriginalRequestMappingResults()->getErrors();
-
-        self::assertEquals([new Error('any translation', 1554912163)], $errors);
-    }
-
-    /**
-     * @test
-     */
-    public function initializeChangePasswordActionShouldNotStopWorkflowIfNewPasswordIsValid()
-    {
-        $request = new Request();
-        $request->setArguments([
-            'hash' => 'some hash',
-            'newPass' => 'newPassword',
-            'newPassRepeat' => 'newPassword',
-        ]);
-
-        $this->inject($this->subject, 'request', $request);
-        $this->inject($this->subject, 'settings', $this->settings);
-
-        $this->subject->initializeChangePasswordAction();
-
-        static::assertEmpty($request->getOriginalRequestMappingResults()->getErrors());
     }
 
     /**
@@ -371,71 +318,114 @@ class PasswordRecoveryControllerTest extends UnitTestCase
         $this->inject($this->subject, 'controllerContext', $controllerContext->reveal());
     }
 
-    protected function mockRedirect(
-        $actionName,
-        $controllerName = '',
-        $arguments = null,
-        $extensionName = 'felogin',
-        $pageUid = null
-    ): void {
-        $contentObject = $this->prophesize(ContentObjectRenderer::class);
-        $contentObject->getUserObjectType()->willReturn('foo');
+    /**
+     * @test
+     */
+    public function recoveryActionShouldTryToFetchEmailFromUserAndSendMailIfEmailIsFound(): void
+    {
+        $emailOrUsername = 'mycoolusername';
+        $email = 'my@coolemail.com';
 
-        $configurationManager = $this->prophesize(ConfigurationManager::class);
-        $configurationManager->getConfiguration(ConfigurationManagerInterface::CONFIGURATION_TYPE_SETTINGS)->willReturn($this->settings);
-        $configurationManager->getContentObject()->willReturn($contentObject->reveal());
+        $this->mockFetchEmailFromUser($emailOrUsername, $email);
+        $this->mockAddFlashMessage();
+        $this->mockRedirect('login', 'Login');
 
-        $this->subject->injectConfigurationManager($configurationManager->reveal());
+        $recoveryService = $this->prophesize(RecoveryServiceInterface::class);
+        $this->subject->injectRecoveryService($recoveryService->reveal());
+        $this->subject->recoveryAction($emailOrUsername);
 
-        $response = $this->prophesize(Response::class);
-        $response->setHeader(Argument::any(), Argument::any())->shouldBeCalled();
-        $response->setStatus(303)->shouldBeCalled();
-        $response->setContent(Argument::any())->shouldBeCalled();
-        $this->inject($this->subject, 'response', $response->reveal());
+        $recoveryService->sendRecoveryEmail($email)->shouldHaveBeenCalled();
+    }
 
-        $cacheService = $this->prophesize(CacheService::class);
-        $cacheService->clearCachesOfRegisteredPageIds()->shouldBeCalled();
-
-        $objectManager = $this->prophesize(ObjectManager::class);
-        $objectManager->get(Arguments::class)->willReturn(new Arguments());
-        $objectManager->get(CacheService::class)->willReturn($cacheService->reveal());
-
-        $this->subject->injectObjectManager($objectManager->reveal());
-
-        $request = $this->prophesize(Request::class);
-        $this->inject($this->subject, 'request', $request->reveal());
-
-        $uriBuilder = $this->prophesize(UriBuilder::class);
-        $uriBuilder->uriFor($actionName, null, $controllerName, $extensionName)->shouldBeCalled();
-        $uriBuilder->setCreateAbsoluteUri(true)->shouldBeCalled();
-        $uriBuilder->setTargetPageUid($pageUid)->willReturn($uriBuilder->reveal());
-        $uriBuilder->reset()->willReturn($uriBuilder->reveal());
-        $this->inject($this->subject, 'uriBuilder', $uriBuilder->reveal());
-
-        $this->expectException(StopActionException::class);
+    public function invalidHashDataProvider(): \Generator
+    {
+        return [
+            yield 'no hash parameter' => ['hash' => null,],
+            yield 'empty hash parameter' => ['hash' => '',],
+            yield 'hash is an int' => ['hash' => 1337,],
+            yield 'hash is an array' => ['hash' => ['foo'],],
+            yield 'hash is a boolean' => ['hash' => false,],
+            yield 'hash does not contain a "pipe"' => ['hash' => 'some hash without a pipe',],
+        ];
     }
 
     /**
-     * @param \Prophecy\Prophecy\ObjectProphecy $request
-     * @param string $actionName
-     * @param string $controllerName
-     * @param array|null $arguments
+     * @test
      */
-    protected function mockForward(
-        ObjectProphecy $request,
-        string $actionName = 'recovery',
-        string $controllerName = 'PasswordRecovery',
-        array $arguments = null
-    ): void {
-        $this->expectException(StopActionException::class);
+    public function initializeChangePasswordActionShouldExitEarlyIfNewPasswordOrPasswordRepeatIsNotSet(): void
+    {
+        $result = $this->prophesize(Result::class);
 
-        $request->setDispatched(false)->shouldBeCalled();
-        $request->setControllerActionName($actionName)->shouldBeCalled();
-        $request->setControllerName($controllerName)->shouldBeCalled();
-        $request->setControllerExtensionName('felogin')->shouldBeCalled();
+        $request = $this->prophesize(Request::class);
+        $request->getOriginalRequestMappingResults()->willReturn($result->reveal());
+        $request->hasArgument('newPass')->willReturn(true);
+        $request->hasArgument('newPassRepeat')->willReturn(false);
 
-        if ($arguments) {
-            $request->setArguments($arguments)->shouldBeCalled();
+        $request->getArgument('newPass')->willReturn('');
+        $request->getArgument('newPassRepeat')->willReturn(null);
+        $request->setOriginalRequestMappingResults($result->reveal())->shouldBeCalled();
+        $request->getArgument('hash')->willReturn('hash');
+
+        $this->mockForward($request, 'showChangePassword', 'PasswordRecovery', ['hash' => 'hash']);
+
+        $this->inject($this->subject, 'request', $request->reveal());
+        $this->subject->initializeChangePasswordAction();
+    }
+
+    /**
+     * @test
+     */
+    public function initializeChangePasswordActionShouldValidateNewPasswordAndForwardOnError(): void
+    {
+        $result = new Result();
+        $request = new Request();
+        $request->setOriginalRequestMappingResults($result);
+        $request->setArguments([
+            'hash' => 'some hash',
+            'newPass' => 'new password',
+            'newPassRepeat' => 'new password repeated',
+        ]);
+
+        $this->inject($this->subject, 'request', $request);
+        $this->inject($this->subject, 'settings', $this->settings);
+
+        try {
+            $this->subject->initializeChangePasswordAction();
+            $this->fail();
+        } catch (StopActionException $e) {
         }
+
+        $errors = $request->getOriginalRequestMappingResults()->getErrors();
+
+        self::assertEquals([new Error('any translation', 1554912163)], $errors);
+    }
+
+    /**
+     * @test
+     */
+    public function initializeChangePasswordActionShouldNotStopWorkflowIfNewPasswordIsValid()
+    {
+        $request = new Request();
+        $request->setArguments([
+            'hash' => 'some hash',
+            'newPass' => 'newPassword',
+            'newPassRepeat' => 'newPassword',
+        ]);
+
+        $this->inject($this->subject, 'request', $request);
+        $this->inject($this->subject, 'settings', $this->settings);
+
+        $this->subject->initializeChangePasswordAction();
+
+        static::assertEmpty($request->getOriginalRequestMappingResults()->getErrors());
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->subject = $this->getAccessibleMock(PasswordRecoveryController::class, ['getTranslation']);
+
+        $this->subject->method('getTranslation')->willReturn('any translation');
     }
 }

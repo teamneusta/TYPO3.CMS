@@ -37,13 +37,6 @@ class RecoveryServiceTest extends UnitTestCase
      */
     protected $subject;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->subject = new RecoveryService();
-    }
-
     /**
      * @test
      */
@@ -65,6 +58,19 @@ class RecoveryServiceTest extends UnitTestCase
         $this->mockGetQueryBuilder($queryBuilder);
 
         static::assertFalse($this->subject->existsUserWithHash('some hash'));
+    }
+
+    /**
+     * @param \Prophecy\Prophecy\ObjectProphecy $queryBuilder
+     */
+    protected function mockGetQueryBuilder(\Prophecy\Prophecy\ObjectProphecy $queryBuilder): void
+    {
+        $connection = $this->prophesize(Connection::class);
+        $connection->createQueryBuilder()->willReturn($queryBuilder->reveal());
+
+        $connectionPool = $this->prophesize(ConnectionPool::class);
+        $connectionPool->getConnectionForTable(Argument::any())->willReturn($connection->reveal());
+        GeneralUtility::addInstance(ConnectionPool::class, $connectionPool->reveal());
     }
 
     /**
@@ -94,16 +100,10 @@ class RecoveryServiceTest extends UnitTestCase
         $this->subject->updatePasswordAndInvalidateHash('some hash', 'some hashed password');
     }
 
-    /**
-     * @param \Prophecy\Prophecy\ObjectProphecy $queryBuilder
-     */
-    protected function mockGetQueryBuilder(\Prophecy\Prophecy\ObjectProphecy $queryBuilder): void
+    protected function setUp(): void
     {
-        $connection = $this->prophesize(Connection::class);
-        $connection->createQueryBuilder()->willReturn($queryBuilder->reveal());
+        parent::setUp();
 
-        $connectionPool = $this->prophesize(ConnectionPool::class);
-        $connectionPool->getConnectionForTable(Argument::any())->willReturn($connection->reveal());
-        GeneralUtility::addInstance(ConnectionPool::class, $connectionPool->reveal());
+        $this->subject = new RecoveryService();
     }
 }

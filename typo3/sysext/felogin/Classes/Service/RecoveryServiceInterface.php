@@ -22,7 +22,7 @@ namespace TYPO3\CMS\Felogin\Service;
 interface RecoveryServiceInterface
 {
     /**
-     * Sends email to $emailAddress with recovery instructions
+     * Sends an email to $emailAddress with recovery instructions
      *
      * @param string $emailAddress
      * @return void

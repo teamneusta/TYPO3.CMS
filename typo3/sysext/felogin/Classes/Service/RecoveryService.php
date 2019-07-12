@@ -65,46 +65,6 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
     }
 
     /**
-     * Change the password for an user based on hash.
-     *
-     * @param string $hash The hash of the feUser that should be resolved.
-     * @param string $passwordHash The new password.
-     * @throws \TYPO3\CMS\Core\Context\Exception\AspectNotFoundException
-     */
-    public function updatePasswordAndInvalidateHash(string $hash, string $passwordHash): void
-    {
-        $queryBuilder = $this->getQueryBuilder();
-
-        $currentTimestamp = GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp');
-        $queryBuilder->update('fe_users')
-            ->set('password', $passwordHash)
-            ->set('felogin_forgotHash', '""', false)
-            ->set('tstamp', $currentTimestamp)
-            ->where(
-                $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash))
-            )
-            ->execute();
-    }
-
-    /**
-     * Returns true if an user exists with hash as `felogin_forgothash`, otherwise false.
-     *
-     * @param string $hash The hash of the feUser that should be check for existence.
-     * @return bool Either true or false based on the existence of the user.
-     */
-    public function existsUserWithHash(string $hash): bool
-    {
-        $queryBuilder = $this->getQueryBuilder();
-        $predicates = $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash));
-
-        return (bool)$queryBuilder->count('uid')
-            ->from('fe_users')
-            ->where($predicates)
-            ->execute()
-            ->fetchColumn();
-    }
-
-    /**
      * @throws \TYPO3\CMS\Felogin\Service\IncompleteConfigurationException
      */
     protected function validateTypoScriptSettings(): void
@@ -341,5 +301,45 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
         }
 
         return $address;
+    }
+
+    /**
+     * Change the password for an user based on hash.
+     *
+     * @param string $hash The hash of the feUser that should be resolved.
+     * @param string $passwordHash The new password.
+     * @throws \TYPO3\CMS\Core\Context\Exception\AspectNotFoundException
+     */
+    public function updatePasswordAndInvalidateHash(string $hash, string $passwordHash): void
+    {
+        $queryBuilder = $this->getQueryBuilder();
+
+        $currentTimestamp = GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp');
+        $queryBuilder->update('fe_users')
+            ->set('password', $passwordHash)
+            ->set('felogin_forgotHash', '""', false)
+            ->set('tstamp', $currentTimestamp)
+            ->where(
+                $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash))
+            )
+            ->execute();
+    }
+
+    /**
+     * Returns true if an user exists with hash as `felogin_forgothash`, otherwise false.
+     *
+     * @param string $hash The hash of the feUser that should be check for existence.
+     * @return bool Either true or false based on the existence of the user.
+     */
+    public function existsUserWithHash(string $hash): bool
+    {
+        $queryBuilder = $this->getQueryBuilder();
+        $predicates = $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash));
+
+        return (bool)$queryBuilder->count('uid')
+            ->from('fe_users')
+            ->where($predicates)
+            ->execute()
+            ->fetchColumn();
     }
 }

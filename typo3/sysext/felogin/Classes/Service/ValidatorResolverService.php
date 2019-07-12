@@ -33,9 +33,9 @@ class ValidatorResolverService implements SingletonInterface
      *
      * @param array $validatorConfig
      *
-     * @return Generator
+     * @return Generator|null
      */
-    public function resolve(array $validatorConfig): Generator
+    public function resolve(array $validatorConfig): ?Generator
     {
         foreach ($validatorConfig as $validator) {
             if (is_string($validator)) {

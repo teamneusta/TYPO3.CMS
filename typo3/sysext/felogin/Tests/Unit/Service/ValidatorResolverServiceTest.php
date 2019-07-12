@@ -31,13 +31,6 @@ class ValidatorResolverServiceTest extends UnitTestCase
      */
     protected $subject;
 
-    protected function setUp(): void
-    {
-        $this->subject = new ValidatorResolverService;
-
-        parent::setUp();
-    }
-
     /**
      * @test
      */
@@ -64,21 +57,23 @@ class ValidatorResolverServiceTest extends UnitTestCase
         }
     }
 
-    public function validatorConfigDataProvider(): array
+    public function validatorConfigDataProvider(): \Generator
     {
         return [
-            'simple className' => [
-                'config' => [NotEmptyValidator::class],
-            ],
-            'with options' => [
+            yield 'simple className' => ['config' => [NotEmptyValidator::class]],
+            yield 'with options' => [
                 'config' => [['className' => StringLengthValidator::class, 'options' => ['minimum' => 3]]],
             ],
-            'complex with both options and simple class names' => [
-                'config' => [
-                    NotEmptyValidator::class,
-                    ['className' => StringLengthValidator::class, 'options' => ['minimum' => 3]],
-                ],
+            yield 'complex with both options and simple class names' => [
+                'config' => [NotEmptyValidator::class, ['className' => StringLengthValidator::class, 'options' => ['minimum' => 3]]],
             ],
         ];
+    }
+
+    protected function setUp(): void
+    {
+        $this->subject = new ValidatorResolverService;
+
+        parent::setUp();
     }
 }
