@@ -18,13 +18,12 @@ namespace TYPO3\CMS\Felogin\Controller;
 
 use TYPO3\CMS\Core\Authentication\LoginType;
 use TYPO3\CMS\Core\Context\Context;
-use TYPO3\CMS\Core\Context\Exception\AspectNotFoundException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
-use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
+use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 use TYPO3\CMS\Felogin\Redirect\RedirectHandler;
 use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
-use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
+use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 
 /**
  * Used for plugin login
@@ -43,25 +42,29 @@ class LoginController extends ActionController
     /**
      * @var string
      */
-    protected $loginType;
+    protected $loginType = '';
 
     public function __construct(RedirectHandler $redirectHandler)
     {
         $this->redirectHandler = $redirectHandler;
     }
 
+    /**
+     * initialize redirects
+     */
     public function initializeAction(): void
     {
         $this->redirectHandler->init($this->settings, $this->request);
 
         $this->loginType = (string)$this->getPropertyFromGetAndPost('logintype');
 
-        if (($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT) && !$this->isRedirectDisabled()) {
+        if ($this->isLoginOrLogoutInProgress() && !$this->isRedirectDisabled()) {
             $redirectUrl = $this->redirectHandler->processRedirect();
+
             if (!$this->getFeUser()->isCookieSet() && $this->isUserLoggedIn()) {
                 $this->view->assign('cookieWarning', true);
-            } else {
-                $this->redirectIfNecessary($redirectUrl);
+            } elseif($redirectUrl !== '') {
+                $this->redirectToUri($redirectUrl);
             }
         }
     }
@@ -93,22 +96,10 @@ class LoginController extends ActionController
         );
     }
 
-    protected function getRedirectReferrer():string
-    {
-        return $this->request->hasArgument('redirectReferrer') ? (string)$this->request->getArgument('redirectReferrer') : '';
-    }
-
-    protected function getReferer():string
-    {
-        return (string)$this->getPropertyFromGetAndPost('referer');
-    }
-
     /**
      * user overview for logged in users
      *
      * @param bool $showLoginMessage
-     * @throws StopActionException
-     * @throws AspectNotFoundException
      */
     public function overviewAction(bool $showLoginMessage = false): void
     {
@@ -137,7 +128,6 @@ class LoginController extends ActionController
             $actionUri = $this->redirectHandler->getLogoutRedirectUrl();
         }
 
-
         $this->view->assignMultiple(
             [
                 'user'       => $this->getFeUser()->user,
@@ -146,6 +136,18 @@ class LoginController extends ActionController
                 'actionUri'  => $actionUri
             ]
         );
+    }
+
+    protected function getRedirectReferrer(): string
+    {
+        return $this->request->hasArgument('redirectReferrer') ? (string)$this->request->getArgument(
+            'redirectReferrer'
+        ) : '';
+    }
+
+    protected function getReferer(): string
+    {
+        return (string)$this->getPropertyFromGetAndPost('referer');
     }
 
     /**
@@ -228,7 +230,7 @@ class LoginController extends ActionController
      *
      * @return string
      */
-    protected function getLoginRedirectURL():string
+    protected function getLoginRedirectURL(): string
     {
         return (string)$this->getPropertyFromGetAndPost('redirect_url');
     }
@@ -248,7 +250,9 @@ class LoginController extends ActionController
 
     protected function isPermaloginDisabled(int $permaLogin): bool
     {
-        return $permaLogin > 1 || (int)($this->settings['showPermaLogin'] ?? 0) === 0 || $GLOBALS['TYPO3_CONF_VARS']['FE']['lifetime'] === 0;
+        return $permaLogin > 1
+            || (int)($this->settings['showPermaLogin'] ?? 0) === 0
+            || $GLOBALS['TYPO3_CONF_VARS']['FE']['lifetime'] === 0;
     }
 
     /**
@@ -258,7 +262,9 @@ class LoginController extends ActionController
      */
     protected function shouldRedirectToOverview(): bool
     {
-        return $this->isUserLoggedIn() && ($this->loginType === LoginType::LOGIN) && !($this->settings['showLogoutFormAfterLogin'] ?? 0);
+        return $this->isUserLoggedIn()
+            && ($this->loginType === LoginType::LOGIN)
+            && !($this->settings['showLogoutFormAfterLogin'] ?? 0);
     }
 
     /**
@@ -278,34 +284,23 @@ class LoginController extends ActionController
         return $messageKey;
     }
 
-    /**
-     * @param string $redirectUrl
-     */
-    protected function redirectIfNecessary($redirectUrl):void
+    protected function getFeUser(): FrontendUserAuthentication
     {
-        if ($redirectUrl === '') {
-            return;
-        }
-        //@ToDo: Do the redirect. Really ;-)
-        die('Leite weiter zu ' . $redirectUrl);
-    }
-
-    /**
-     * @return \TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication
-     */
-    protected function getFeUser() {
         return $GLOBALS['TSFE']->fe_user;
     }
 
     /**
      * Should this controller make use of possibly configured redirects at all?
+     *
      * @return bool
      */
-    public function isRedirectDisabled():bool
+    protected function isRedirectDisabled(): bool
     {
-        return $this->request->hasArgument('noredirect') || $this->settings['noredirect'] || $this->settings['redirectDisable'];
+        return
+            $this->request->hasArgument('noredirect')
+            || $this->settings['noredirect']
+            || $this->settings['redirectDisable'];
     }
-
 
     protected function emitLoginConfirmed(): void
     {
@@ -321,5 +316,13 @@ class LoginController extends ActionController
         }
 
         return $signalSlotDispatcher;
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isLoginOrLogoutInProgress(): bool
+    {
+        return ($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT);
     }
 }
