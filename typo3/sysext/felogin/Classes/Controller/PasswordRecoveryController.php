@@ -222,7 +222,7 @@ class PasswordRecoveryController extends ActionController
             ->resolve($this->settings['passwordValidators']);
 
         // Call each validator on new password
-        foreach ($validators as $validator) {
+        foreach ($validators ?? [] as $validator) {
             $result = $validator->validate($newPass);
             $originalResult->merge($result);
         }
