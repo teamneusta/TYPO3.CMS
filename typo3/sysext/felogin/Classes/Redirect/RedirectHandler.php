@@ -72,18 +72,14 @@ class RedirectHandler
      */
     protected $uriBuilder;
 
-    public function __construct()
+    public function __construct(UriBuilder $uriBuilder)
     {
+        $this->uriBuilder = $uriBuilder;
         $this->redirectUrlValidator = GeneralUtility::makeInstance(
             RedirectUrlValidator::class,
             GeneralUtility::makeInstance(SiteFinder::class),
             (int)$GLOBALS['TSFE']->id
         );
-    }
-
-    public function injectUriBuilder(UriBuilder $uriBuilder): void
-    {
-        $this->uriBuilder = $uriBuilder;
     }
 
     public function process(array $settings, Request $request)
@@ -105,16 +101,12 @@ class RedirectHandler
      */
     protected function processRedirect(array $redirectMethods): string
     {
-        $redirectPageLogin = (int)($this->settings['redirectPageLogin'] ?? 0);
-        $redirectPageLogout = (int)($this->settings['redirectPageLogout'] ?? 0);
         $isLoginTypeLogin = $this->loginType === LoginType::LOGIN;
-        $isLoginTypeLogout = $this->loginType === LoginType::LOGOUT;
 
-        $method = 'loginError';
         if (
             $isLoginTypeLogin
             && $this->userIsLoggedIn === false
-            && $this->isRedirectMethodActive($redirectMethods, $method)
+            && $this->isRedirectMethodActive($redirectMethods, 'loginError')
         ) {
             return $this->handleRedirectMethodLoginError();
         }
@@ -134,7 +126,9 @@ class RedirectHandler
                             $redirectUrl = $this->handRedirectMethodUserLogin();
                             break;
                         case 'login':
-                            $redirectUrl = $this->handleRedirectMethodLogin($redirectPageLogin);
+                            $redirectUrl = $this->handleRedirectMethodLogin(
+                                (int)($this->settings['redirectPageLogin'] ?? 0)
+                            );
                             break;
                         case 'getpost':
                             $redirectUrl = $this->getRedirectUrlRequestParam();
@@ -147,9 +141,10 @@ class RedirectHandler
                             break;
                     }
                 }
-            } elseif ($isLoginTypeLogout) {
+            } elseif ($this->loginType === LoginType::LOGOUT) {
                 // TODO: after logout signal for general actions after after logout has been confirmed
-                $redirectUrl = $this->handleRedirectMethodLogout($redirMethod === 'logout', $redirectPageLogout);
+                $redirectUrl = $this->handleRedirectMethodLogout($redirMethod === 'logout', (int)($this->settings['redirectPageLogout'] ?? 0)
+                );
             }
 
             if ($redirectUrl !== '') {
