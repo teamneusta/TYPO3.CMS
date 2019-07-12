@@ -286,8 +286,8 @@ class LoginController extends ActionController
         if ($redirectUrl === '') {
             return;
         }
-        //@ToDo: Do the redirect. Really ;-)
-        die('Leite weiter zu ' . $redirectUrl);
+
+        \TYPO3\CMS\Core\Utility\HttpUtility::redirect($redirectUrl);
     }
 
     /**

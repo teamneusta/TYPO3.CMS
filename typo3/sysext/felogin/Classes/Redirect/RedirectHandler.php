@@ -478,7 +478,7 @@ class RedirectHandler
      */
     protected function handleSuccessfulLogin(string $redirectMode): string
     {
-        if ($this->userIsLoggedIn) {
+        if (!$this->userIsLoggedIn) {
             return '';
         }
 
