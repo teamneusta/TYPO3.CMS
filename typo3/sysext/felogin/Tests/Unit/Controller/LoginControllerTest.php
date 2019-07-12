@@ -131,20 +131,6 @@ class LoginControllerTest extends UnitTestCase
         $this->subject->loginAction();
     }
 
-<<<<<<< HEAD
-=======
-    protected function setLoginType(string $loginType = LoginType::LOGIN): void
-    {
-        $this->request
-            ->getParsedBody()
-            ->willReturn(
-                [
-                    'logintype' => $loginType,
-                ]
-            );
-    }
-
->>>>>>> origin/felogin
     /**
      * @test
      */
@@ -177,24 +163,6 @@ class LoginControllerTest extends UnitTestCase
         $this->subject->loginAction();
     }
 
-<<<<<<< HEAD
-=======
-    protected function injectRequestForControllerAction(string $controllerActionName): ObjectProphecy
-    {
-        $webRequest = $this->prophesize(Request::class);
-        $webRequest
-            ->setDispatched(false)
-            ->shouldBeCalled();
-        $webRequest
-            ->setControllerActionName($controllerActionName)
-            ->shouldBeCalled();
-
-        $this->inject($this->subject, 'request', $webRequest->reveal());
-
-        return $webRequest;
-    }
-
->>>>>>> origin/felogin
     /**
      * @test
      */
@@ -271,13 +239,8 @@ class LoginControllerTest extends UnitTestCase
 
         $this->view->assignMultiple(
             [
-<<<<<<< HEAD
-                'user'         => ['username' => 'foo'],
-                'loginMessage' => true
-=======
                 'user' => ['username' => 'foo'],
                 'loginMessage' => true,
->>>>>>> origin/felogin
             ]
         );
 
