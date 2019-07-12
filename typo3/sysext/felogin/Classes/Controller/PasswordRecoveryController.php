@@ -170,6 +170,7 @@ class PasswordRecoveryController extends ActionController
             ->getDefaultHashInstance('FE')
             ->getHashedPassword($newPass);
 
+        $this->passwordChangedHook($newPass, $passwordHash, $hash);
         $this->recoveryService->updatePasswordAndInvalidateHash($hash, $passwordHash);
 
         $this->redirect('login', 'Login', 'felogin');
@@ -274,5 +275,49 @@ class PasswordRecoveryController extends ActionController
             TreeUidListProvider::class,
             $this->configurationManager->getContentObject()
         );
+    }
+
+    /**
+     * @param string $newPass Unencrypted new password
+     * @param string $passwordHash New password hash passed as reference
+     * @param string $hash Forgot password hash
+     * @throws \TYPO3\CMS\Extbase\Mvc\Exception\StopActionException
+     */
+    protected function passwordChangedHook(string $newPass, string &$passwordHash, string $hash): void
+    {
+        if (!empty($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['password_changed'])) {
+            $queryBuilder = $this->getQueryBuilder();
+            $user = $queryBuilder->select('*')
+                ->from('fe_users')
+                ->where(
+                    $queryBuilder->expr()->eq('felogin_forgotHash', $queryBuilder->createNamedParameter($hash))
+                )->execute()
+                ->fetch() ?: [];
+
+            $_params = [
+                'user' => $user,
+                'newPassword' => $passwordHash,
+                'newPasswordUnencrypted' => $newPass,
+                'passwordValid' => true,
+                'passwordInvalidMessage' => '',
+            ];
+            foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['password_changed'] as $_func) {
+                GeneralUtility::callUserFunction($_func, $_params, $this);
+            }
+            $passwordHash = $_params['newPassword'];
+
+            if (!$_params['passwordValid']) {
+                $requestResult = $this->request->getOriginalRequestMappingResults();
+                $requestResult->addError(new Error($_params['passwordInvalidMessage'], 1562846833));
+                $this->request->setOriginalRequestMappingResults($requestResult);
+
+                $this->forward(
+                    'showChangePassword',
+                    'PasswordRecovery',
+                    'felogin',
+                    ['hash' => $hash]
+                );
+            }
+        }
     }
 }

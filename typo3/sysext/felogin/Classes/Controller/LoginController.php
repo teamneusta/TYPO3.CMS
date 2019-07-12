@@ -24,6 +24,7 @@ use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
 use TYPO3\CMS\Felogin\Redirect\RedirectHandler;
 use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
+use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 
 /**
  * Used for plugin login
@@ -114,6 +115,8 @@ class LoginController extends ActionController
         if (!$this->isUserLoggedIn()) {
             $this->forward('login');
         }
+
+        $this->emitLoginConfirmed();
 
         $this->view->assignMultiple(
             [
@@ -303,4 +306,20 @@ class LoginController extends ActionController
         return $this->request->hasArgument('noredirect') || $this->settings['noredirect'] || $this->settings['redirectDisable'];
     }
 
+
+    protected function emitLoginConfirmed(): void
+    {
+        $this->getSignalSlotDispatcher()->dispatch(__CLASS__, 'login_confirmed');
+    }
+
+    protected function getSignalSlotDispatcher(): Dispatcher
+    {
+        static $signalSlotDispatcher;
+
+        if ($signalSlotDispatcher === null) {
+            $signalSlotDispatcher = $this->objectManager->get(Dispatcher::class);
+        }
+
+        return $signalSlotDispatcher;
+    }
 }
