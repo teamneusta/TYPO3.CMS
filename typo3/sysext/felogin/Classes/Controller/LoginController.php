@@ -121,7 +121,7 @@ class LoginController extends ActionController
         $this->view->assignMultiple(
             [
                 'user'             => $this->getFeUser()->user,
-                'showLoginMessage' => $showLoginMessage
+                'messageKey'       => $showLoginMessage ? 'success' : 'status'
             ]
         );
     }
