@@ -42,11 +42,12 @@ class LoginController extends ActionController
         $isLoggedInd = $this->isUserLoggedIn();
 
         $this->handleForwards($isLoggedInd, $loginType);
+        $this->onSubmitFuncsHook();
 
         $this->view->assignMultiple(
             [
-                'messageKey'       => $this->getStatusMessage($loginType, $isLoggedInd),
-                'storagePid'       => $this->getStoragePid(),
+                'messageKey' => $this->getStatusMessage($loginType, $isLoggedInd),
+                'storagePid' => $this->getStoragePid(),
                 'permaloginStatus' => $this->getPermaloginStatus()
             ]
         );
@@ -67,8 +68,8 @@ class LoginController extends ActionController
 
         $this->view->assignMultiple(
             [
-                'user'             => $GLOBALS['TSFE']->fe_user->user ?? [],
-                'showLoginMessage' => $showLoginMessage
+                'user' => $GLOBALS['TSFE']->fe_user->user ?? [],
+                'showLoginMessage' => $showLoginMessage,
             ]
         );
     }
@@ -80,7 +81,7 @@ class LoginController extends ActionController
     {
         $this->view->assignMultiple(
             [
-                'user'       => $GLOBALS['TSFE']->fe_user->user ?? [],
+                'user' => $GLOBALS['TSFE']->fe_user->user ?? [],
                 'storagePid' => $this->getStoragePid(),
             ]
         );
@@ -189,5 +190,29 @@ class LoginController extends ActionController
         }
 
         return $messageKey;
+    }
+
+    /**
+     * Handle loginFormOnSubmitFuncs hook
+     *
+     * @return void
+     */
+    protected function onSubmitFuncsHook(): void
+    {
+        foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['loginFormOnSubmitFuncs'] ?? [] as $funcRef) {
+            [$onSub, $hid] = GeneralUtility::callUserFunction($funcRef, $_params, $this);
+            $onSubmit[] = $onSub;
+            $extraHidden[] = $hid;
+        }
+
+        if (!empty($onSubmit)) {
+            $onSubmit = implode('; ', $onSubmit) . '; return true;';
+            $this->view->assign('onSubmit', $onSubmit);
+        }
+
+        if (!empty($extraHidden)) {
+            $extraHidden = implode(LF, $extraHidden);
+            $this->view->assign('extraHidden', $extraHidden);
+        }
     }
 }
