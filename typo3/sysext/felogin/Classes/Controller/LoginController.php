@@ -42,17 +42,7 @@ class LoginController extends ActionController
     /**
      * @var string
      */
-    protected $redirectUrl;
-
-    /**
-     * @var string
-     */
     protected $loginType;
-
-    /**
-     * @var bool
-     */
-    protected $cookieWarning = false;
 
     public function __construct(RedirectHandler $redirectHandler)
     {
@@ -65,14 +55,12 @@ class LoginController extends ActionController
 
         $this->loginType = (string)$this->getPropertyFromGetAndPost('logintype');
 
-        if (!$this->isRedirectDisabled()) {
-            $this->redirectUrl = $this->redirectHandler->processRedirect();
-        }
-
-        if (($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT) && $this->redirectUrl && !$this->isRedirectDisabled()) {
-            // Das geht nicht: isCookieSet hängt nicht am fe_user sondern an der fe_authentication...
+        if (($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT) && !$this->isRedirectDisabled()) {
+            $redirectUrl = $this->redirectHandler->processRedirect();
             if (!$this->getFeUser()->isCookieSet() && $this->isUserLoggedIn()) {
-                $this->cookieWarning = true;
+                $this->view->assign('cookieWarning', true);
+            } else {
+                $this->redirectIfNecessary($redirectUrl);
             }
         }
     }
@@ -84,17 +72,21 @@ class LoginController extends ActionController
     {
         $this->handleLoginForwards();
 
-        $this->redirectIfNecessary();
+        $redirectUrl = $this->redirectHandler->getRedirectUrlRequestParam();
+        if (!$this->isRedirectDisabled()) {
+            $redirectUrl = $this->redirectHandler->getLoginRedirectUrl();
+        }
 
         $this->view->assignMultiple(
             [
                 'messageKey'       => $this->getStatusMessage(),
                 'storagePid'       => $this->getStoragePid(),
                 'permaloginStatus' => $this->getPermaloginStatus(),
-                'redirectURL'      => $this->getLoginRedirectURL(),
+                'redirectURL'      => $redirectUrl,
                 'redirectReferrer' => $this->getRedirectReferrer(),
+                'referer'          => $this->getReferer(),
                 'noRedirect'       => $this->isRedirectDisabled(),
-                'cookieWarning'    => $this->cookieWarning
+
             ]
         );
     }
@@ -102,6 +94,11 @@ class LoginController extends ActionController
     protected function getRedirectReferrer():string
     {
         return $this->request->hasArgument('redirectReferrer') ? (string)$this->request->getArgument('redirectReferrer') : '';
+    }
+
+    protected function getReferer():string
+    {
+        return (string)$this->getPropertyFromGetAndPost('referer');
     }
 
     /**
@@ -119,9 +116,8 @@ class LoginController extends ActionController
 
         $this->view->assignMultiple(
             [
-                'user'             => $this->getFeUser(),
-                'showLoginMessage' => $showLoginMessage,
-                'cookieWarning'    => $this->cookieWarning
+                'user'             => $this->getFeUser()->user,
+                'showLoginMessage' => $showLoginMessage
             ]
         );
     }
@@ -131,12 +127,19 @@ class LoginController extends ActionController
      */
     public function logoutAction(): void
     {
-        //@todo: noredirect params
+
+        $actionUri = $this->redirectHandler->getRedirectUrlRequestParam();
+        if (!$this->isRedirectDisabled()) {
+            $actionUri = $this->redirectHandler->getLogoutRedirectUrl();
+        }
+
+
         $this->view->assignMultiple(
             [
-                'user'       => $this->getFeUser(),
+                'user'       => $this->getFeUser()->user,
                 'storagePid' => $this->getStoragePid(),
-                'cookieWarning'    => $this->cookieWarning,
+                'noRedirect' => $this->isRedirectDisabled(),
+                'actionUri'  => $actionUri
             ]
         );
     }
@@ -169,8 +172,6 @@ class LoginController extends ActionController
 
     /**
      * handle forwards to overview and logout actions from login action
-     *
-     * @throws StopActionException
      */
     protected function handleLoginForwards(): void
     {
@@ -187,7 +188,6 @@ class LoginController extends ActionController
      * check if the user is logged in
      *
      * @return bool
-     * @throws AspectNotFoundException
      */
     protected function isUserLoggedIn(): bool
     {
@@ -251,17 +251,23 @@ class LoginController extends ActionController
         return $messageKey;
     }
 
-    protected function redirectIfNecessary():void
+    /**
+     * @param string $redirectUrl
+     */
+    protected function redirectIfNecessary($redirectUrl):void
     {
-        if ($this->redirectUrl === '') {
+        if ($redirectUrl === '') {
             return;
         }
         //@ToDo: Do the redirect. Really ;-)
-        die('Leite weiter zu ' . $this->redirectUrl);
+        die('Leite weiter zu ' . $redirectUrl);
     }
 
+    /**
+     * @return \TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication
+     */
     protected function getFeUser() {
-        return $GLOBALS['TSFE']->fe_user->user ?? [];
+        return $GLOBALS['TSFE']->fe_user;
     }
 
     /**
