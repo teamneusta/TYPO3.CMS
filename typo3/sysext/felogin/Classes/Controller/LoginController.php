@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
 use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
+use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 
 /**
  * Used for plugin login
@@ -195,6 +196,8 @@ class LoginController extends ActionController
             $this->forward('login');
         }
 
+        $this->emitLoginConfirmed();
+
         $this->view->assignMultiple(
             [
                 'user' => $GLOBALS['TSFE']->fe_user->user ?? [],
@@ -214,5 +217,21 @@ class LoginController extends ActionController
                 'storagePid' => $this->getStoragePid(),
             ]
         );
+    }
+
+    protected function emitLoginConfirmed(): void
+    {
+        $this->getSignalSlotDispatcher()->dispatch(__CLASS__, 'login_confirmed');
+    }
+
+    protected function getSignalSlotDispatcher(): Dispatcher
+    {
+        static $signalSlotDispatcher;
+
+        if ($signalSlotDispatcher === null) {
+            $signalSlotDispatcher = $this->objectManager->get(Dispatcher::class);
+        }
+
+        return $signalSlotDispatcher;
     }
 }
