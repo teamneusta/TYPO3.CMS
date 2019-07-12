@@ -26,11 +26,9 @@
                     <f:translate id="permalogin"/>
                     <f:if condition="{permaloginStatus} == 1">
                         <f:then>
-                            <f:form.hidden name="permalogin" value="0" additionalAttributes="{disabled: 'disabled'}"/>
                             <f:form.checkbox name="permalogin" id="permalogin" value="1" checked="checked"/>
                         </f:then>
                         <f:else>
-                            <f:form.hidden name="permalogin" value="0"/>
                             <f:form.checkbox name="permalogin" id="permalogin" value="1"/>
                         </f:else>
                     </f:if>
