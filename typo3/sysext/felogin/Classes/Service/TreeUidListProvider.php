@@ -1,5 +1,6 @@
 <?php
 declare(strict_types = 1);
+
 namespace TYPO3\CMS\Felogin\Service;
 
 /*
@@ -14,6 +15,7 @@ namespace TYPO3\CMS\Felogin\Service;
  *
  * The TYPO3 project - inspiring people to share!
  */
+
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 
@@ -23,6 +25,7 @@ class TreeUidListProvider
      * @var \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer
      */
     protected $cObj;
+
     /**
      * TreeUidListProvider constructor.
      * @param \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer $cObj
@@ -31,6 +34,7 @@ class TreeUidListProvider
     {
         $this->cObj = $cObj;
     }
+
     /**
      * Fetches uid list of pages beneath passed list of page-ids and returns them as a comma separated string.
      *
@@ -44,16 +48,22 @@ class TreeUidListProvider
         if ($depth === 0) {
             return $uidList;
         }
+
         $list = GeneralUtility::trimExplode(',', $uidList);
+
         foreach ($list as $uid) {
             $pidList[] = $this->cObj->getTreeList($uid, $depth);
         }
+
         $uidTreeList = implode(',', $pidList ?? []);
+
         if ($uniqueIds) {
             $uidTreeList = $this->removeDuplicatedIds($uidTreeList);
         }
+
         return $uidTreeList;
     }
+
     /**
      * Removes duplicated ids from comma separated uid list
      *
@@ -63,6 +73,7 @@ class TreeUidListProvider
     protected function removeDuplicatedIds(string $uidList): string
     {
         $uniqueUidArray = array_unique(GeneralUtility::trimExplode(',', $uidList));
+
         return implode(',', $uniqueUidArray);
     }
 }

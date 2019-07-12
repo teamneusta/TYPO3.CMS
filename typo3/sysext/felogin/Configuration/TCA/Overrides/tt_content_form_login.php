@@ -61,7 +61,6 @@ defined('TYPO3_MODE') or die();
                 --palette--;;general,
                 --palette--;;headers,
                 pi_flexform,
-                pages;LLL:EXT:frontend/Resources/Private/Language/locallang_ttc.xlf:pages.ALT.list_formlabel,
             --div--;LLL:EXT:frontend/Resources/Private/Language/locallang_ttc.xlf:tabs.appearance,
                 --palette--;;frames,
                 --palette--;;appearanceLinks,

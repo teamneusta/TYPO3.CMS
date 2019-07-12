@@ -31,6 +31,10 @@ styles.content.loginform {
   emailFromName =
   # cat=Frontend Login/04_EMail/102; type=string; label= Reply To E-Mail Address: Reply-to address used in the change password emails
   replyToEmail =
+  # cat=Frontend Login/04_EMail/103; type=string; label= HTML-email template path: Path to template file used for HTML-Emails
+  emailHtmlTemplatePath = EXT:felogin/Resources/Private/Templates/PasswordRecovery/MailMessage.html
+  # cat=Frontend Login/04_EMail/104; type=string; label= Plain text email template path: Path to template file used for plain text emails
+  emailPlainTemplatePath = EXT:felogin/Resources/Private/Templates/PasswordRecovery/MailMessage.txt
 
   # cat=Frontend Login/05_Redirects/101; type=string; label= Redirect Mode: Comma separated list of redirect modes. Possible values: groupLogin, userLogin, login, getpost, referer, refererDomains, loginError, logout
   redirectMode =

@@ -77,6 +77,7 @@ class LoginController extends ActionController
             $redirectUrl = $this->redirectHandler->getLoginRedirectUrl();
         }
 
+        $this->onSubmitFuncsHook();
         $this->view->assignMultiple(
             [
                 'messageKey'       => $this->getStatusMessage(),
@@ -185,6 +186,30 @@ class LoginController extends ActionController
     }
 
     /**
+     * Handle loginFormOnSubmitFuncs hook
+     *
+     * @return void
+     */
+    protected function onSubmitFuncsHook(): void
+    {
+        foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['loginFormOnSubmitFuncs'] ?? [] as $funcRef) {
+            [$onSub, $hid] = GeneralUtility::callUserFunction($funcRef, $_params, $this);
+            $onSubmit[] = $onSub;
+            $extraHidden[] = $hid;
+        }
+
+        if (!empty($onSubmit)) {
+            $onSubmit = implode('; ', $onSubmit) . '; return true;';
+            $this->view->assign('onSubmit', $onSubmit);
+        }
+
+        if (!empty($extraHidden)) {
+            $extraHidden = implode(LF, $extraHidden);
+            $this->view->assign('extraHidden', $extraHidden);
+        }
+    }
+
+    /**
      * check if the user is logged in
      *
      * @return bool
@@ -194,7 +219,6 @@ class LoginController extends ActionController
         return (bool)GeneralUtility::makeInstance(Context::class)
             ->getPropertyFromAspect('frontend.user', 'isLoggedIn');
     }
-
 
     /**
      * Get RedirURL for Login Form from GP vars
