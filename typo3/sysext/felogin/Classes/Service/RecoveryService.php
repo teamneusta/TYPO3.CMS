@@ -31,6 +31,7 @@ use TYPO3\CMS\Extbase\Configuration\ConfigurationManager;
 use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
 use TYPO3\CMS\Extbase\Object\ObjectManager;
 use TYPO3\CMS\Extbase\Security\Cryptography\HashService;
+use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 use TYPO3\CMS\Fluid\View\StandaloneView;
 
 /**
@@ -61,6 +62,8 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
         $receiver = $this->getReceiverName($userInformation);
 
         $email = $this->prepareMail($receiver, $emailAddress, $hash);
+        $this->emitForgotPasswordMailSignal($email);
+
         GeneralUtility::makeInstance(Mailer::class)->send($email);
     }
 
@@ -341,5 +344,12 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
             ->where($predicates)
             ->execute()
             ->fetchColumn();
+    }
+
+    protected function emitForgotPasswordMailSignal(MailMessage $email): void
+    {
+        GeneralUtility::makeInstance(ObjectManager::class)
+            ->get(Dispatcher::class)
+            ->dispatch(__CLASS__, 'forgotPasswordMail', [$email]);
     }
 }
