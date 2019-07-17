@@ -25,8 +25,9 @@ use TYPO3\CMS\Core\Context\UserAspect;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Web\Request;
-use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
 use TYPO3\CMS\Felogin\Redirect\RedirectHandler;
+use TYPO3\CMS\Felogin\Redirect\RedirectModeHandler;
+use TYPO3\CMS\Felogin\Redirect\ServerRequestHandler;
 use TYPO3\CMS\Felogin\Validation\RedirectUrlValidator;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
@@ -60,14 +61,19 @@ class RedirectHandlerTest extends UnitTestCase
     protected $typo3Request;
 
     /**
-     * @var UriBuilder
-     */
-    protected $uriBuilder;
-
-    /**
      * @var SiteFinder
      */
     protected $siteFinder;
+
+    /**
+     * @var ServerRequestHandler
+     */
+    protected $serverRequestHandler;
+
+    /**
+     * @var RedirectModeHandler
+     */
+    protected $redirectModeHandler;
 
     protected function setUp(): void
     {
@@ -75,8 +81,9 @@ class RedirectHandlerTest extends UnitTestCase
 
         $this->redirectUrlValidator = $this->prophesize(RedirectUrlValidator::class);
         $this->typo3Request = $this->prophesize(ServerRequestInterface::class);
-        $this->uriBuilder = $this->prophesize(UriBuilder::class);
-        $this->siteFinder = $this->prophesize(SiteFinder::class);
+
+        $this->serverRequestHandler = $this->prophesize(ServerRequestHandler::class);
+        $this->redirectModeHandler = $this->prophesize(RedirectModeHandler::class);
 
         GeneralUtility::addInstance(RedirectUrlValidator::class, $this->redirectUrlValidator->reveal());
         GeneralUtility::addInstance(SiteFinder::class, $this->siteFinder->reveal());
@@ -84,7 +91,10 @@ class RedirectHandlerTest extends UnitTestCase
         $GLOBALS['TSFE'] = $this->prophesize(TypoScriptFrontendController::class)->reveal();
         $GLOBALS['TYPO3_REQUEST'] = $this->typo3Request->reveal();
 
-        $this->subject = new RedirectHandler($this->uriBuilder->reveal());
+        $this->subject = new RedirectHandler(
+            $this->serverRequestHandler->reveal(),
+            $this->redirectModeHandler->reveal()
+        );
     }
 
     protected function tearDown(): void
@@ -101,10 +111,11 @@ class RedirectHandlerTest extends UnitTestCase
      */
     public function processShouldReturnStringForLoginTypeLogout(string $expect, array $settings): void
     {
-        $this->setLoginType(LoginType::LOGOUT);
         $request = $this->prophesize(Request::class);
 
-        $this->subject->init($settings, $request->reveal());
+        $this->subject->init(LoginType::LOGOUT, $settings, $request->reveal());
+
+        $this->redirectModeHandler->redirectModeLogout()->willReturn();
 
         self::assertEquals($expect, $this->subject->processRedirect());
     }
@@ -283,17 +294,6 @@ class RedirectHandlerTest extends UnitTestCase
         $this->subject->init($settings, $this->prophesize(Request::class)->reveal());
 
         self::assertEquals('https://valid.url/', $this->subject->getLoginRedirectUrl());
-    }
-
-    protected function setLoginType(string $loginType = LoginType::LOGIN): void
-    {
-        $this->typo3Request
-            ->getParsedBody()
-            ->willReturn(
-                [
-                    'logintype' => $loginType
-                ]
-            );
     }
 
     protected function setUserLoggedIn(bool $userLoggedIn): void

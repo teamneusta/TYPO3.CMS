@@ -22,6 +22,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 use TYPO3\CMS\Felogin\Redirect\RedirectHandler;
+use TYPO3\CMS\Felogin\Redirect\ServerRequestHandler;
 use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
 use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 
@@ -44,9 +45,24 @@ class LoginController extends ActionController
      */
     protected $loginType = '';
 
-    public function __construct(RedirectHandler $redirectHandler)
-    {
+    /**
+     * @var TreeUidListProvider
+     */
+    private $treeUidListProvider;
+
+    /**
+     * @var ServerRequestHandler
+     */
+    private $requestHandler;
+
+    public function __construct(
+        RedirectHandler $redirectHandler,
+        TreeUidListProvider $treeUidListProvider,
+        ServerRequestHandler $requestHandler
+    ) {
         $this->redirectHandler = $redirectHandler;
+        $this->treeUidListProvider = $treeUidListProvider;
+        $this->requestHandler = $requestHandler;
     }
 
     /**
@@ -54,16 +70,15 @@ class LoginController extends ActionController
      */
     public function initializeAction(): void
     {
-        $this->redirectHandler->init($this->settings, $this->request);
-
-        $this->loginType = (string)$this->getPropertyFromGetAndPost('logintype');
+        $this->loginType = (string)$this->requestHandler->getPropertyFromGetAndPost('logintype');
+        $this->redirectHandler->init($this->loginType, $this->settings, $this->request);
 
         if ($this->isLoginOrLogoutInProgress() && !$this->isRedirectDisabled()) {
             $redirectUrl = $this->redirectHandler->processRedirect();
 
             if (!$this->getFeUser()->isCookieSet() && $this->isUserLoggedIn()) {
                 $this->view->assign('cookieWarning', true);
-            } elseif($redirectUrl !== '') {
+            } elseif ($redirectUrl !== '') {
                 $this->redirectToUri($redirectUrl);
             }
         }
@@ -76,7 +91,7 @@ class LoginController extends ActionController
     {
         $this->handleLoginForwards();
 
-        $redirectUrl = $this->redirectHandler->getRedirectUrlRequestParam();
+        $redirectUrl = $this->requestHandler->getRedirectUrlRequestParam();
         if (!$this->isRedirectDisabled()) {
             $redirectUrl = $this->redirectHandler->getLoginRedirectUrl();
         }
@@ -89,9 +104,8 @@ class LoginController extends ActionController
                 'permaloginStatus' => $this->getPermaloginStatus(),
                 'redirectURL'      => $redirectUrl,
                 'redirectReferrer' => $this->getRedirectReferrer(),
-                'referer'          => $this->getReferer(),
+                'referer'          => $this->requestHandler->getPropertyFromGetAndPost('referer'),
                 'noRedirect'       => $this->isRedirectDisabled(),
-
             ]
         );
     }
@@ -122,8 +136,7 @@ class LoginController extends ActionController
      */
     public function logoutAction(): void
     {
-
-        $actionUri = $this->redirectHandler->getRedirectUrlRequestParam();
+        $actionUri = $this->requestHandler->getRedirectUrlRequestParam();
         if (!$this->isRedirectDisabled()) {
             $actionUri = $this->redirectHandler->getLogoutRedirectUrl();
         }
@@ -140,14 +153,9 @@ class LoginController extends ActionController
 
     protected function getRedirectReferrer(): string
     {
-        return $this->request->hasArgument('redirectReferrer') ? (string)$this->request->getArgument(
-            'redirectReferrer'
-        ) : '';
-    }
-
-    protected function getReferer(): string
-    {
-        return (string)$this->getPropertyFromGetAndPost('referer');
+        return $this->request->hasArgument('redirectReferrer')
+            ? (string)$this->request->getArgument('redirectReferrer')
+            : '';
     }
 
     /**
@@ -157,23 +165,10 @@ class LoginController extends ActionController
      */
     protected function getStoragePid(): string
     {
-        $storageProvider = new TreeUidListProvider($this->configurationManager->getContentObject());
-
-        return $storageProvider->getListForIdList((string)$this->settings['pages'], (int)$this->settings['recursive']);
-    }
-
-    /**
-     * returns a property that exists in post or get context
-     *
-     * @param string $propertyName
-     * @return mixed|null
-     */
-    protected function getPropertyFromGetAndPost(string $propertyName)
-    {
-        // todo: refactor when extbase handles PSR-15 requests
-        $request = $GLOBALS['TYPO3_REQUEST'];
-
-        return $request->getParsedBody()[$propertyName] ?? $request->getQueryParams()[$propertyName] ?? null;
+        return $this->treeUidListProvider->getListForIdList(
+            (string)$this->settings['pages'],
+            (int)$this->settings['recursive']
+        );
     }
 
     /**
@@ -223,16 +218,6 @@ class LoginController extends ActionController
     {
         return (bool)GeneralUtility::makeInstance(Context::class)
             ->getPropertyFromAspect('frontend.user', 'isLoggedIn');
-    }
-
-    /**
-     * Get RedirURL for Login Form from GP vars
-     *
-     * @return string
-     */
-    protected function getLoginRedirectURL(): string
-    {
-        return (string)$this->getPropertyFromGetAndPost('redirect_url');
     }
 
     /**
