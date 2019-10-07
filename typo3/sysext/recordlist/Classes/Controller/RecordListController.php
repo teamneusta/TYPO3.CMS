@@ -96,13 +96,6 @@ class RecordListController
     protected $returnUrl;
 
     /**
-     * Clear-cache flag - if set, clears page cache for current id.
-     *
-     * @var bool
-     */
-    protected $clear_cache;
-
-    /**
      * Command: Eg. "delete" or "setCB" (for DataHandler / clipboard operations)
      *
      * @var string
@@ -127,7 +120,7 @@ class RecordListController
      * Module TSconfig
      *
      * @var array
-     * @internal Still used by DatabaseRecordList via $GLOBALS['SOBE']
+     * @internal
      */
     public $modTSconfig;
 
@@ -149,7 +142,7 @@ class RecordListController
      * Module settings (session variable)
      *
      * @var string[]
-     * @internal Still used by DatabaseRecordList via $GLOBALS['SOBE']
+     * @internal
      */
     public $MOD_SETTINGS = [];
 
@@ -201,6 +194,7 @@ class RecordListController
         $this->getLanguageService()->includeLLFile('EXT:core/Resources/Private/Language/locallang_mod_web_list.xlf');
         $this->moduleTemplate->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/Recordlist/FieldSelectBox');
         $this->moduleTemplate->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/Recordlist/Recordlist');
+        $this->moduleTemplate->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/Recordlist/ClearCache');
     }
 
     /**
@@ -222,7 +216,6 @@ class RecordListController
         $this->search_levels = (int)GeneralUtility::_GP('search_levels');
         $this->showLimit = GeneralUtility::_GP('showLimit');
         $this->returnUrl = GeneralUtility::sanitizeLocalUrl(GeneralUtility::_GP('returnUrl'));
-        $this->clear_cache = GeneralUtility::_GP('clear_cache');
         $this->cmd = GeneralUtility::_GP('cmd');
         $this->cmd_table = GeneralUtility::_GP('cmd_table');
         $sessionData['search_field'] = $this->search_field;
@@ -250,18 +243,6 @@ class RecordListController
     }
 
     /**
-     * Clears page cache for the current id, $this->id
-     */
-    protected function clearCache()
-    {
-        if ($this->clear_cache) {
-            $tce = GeneralUtility::makeInstance(DataHandler::class);
-            $tce->start([], []);
-            $tce->clear_cacheCmd($this->id);
-        }
-    }
-
-    /**
      * Main function, starting the rendering of the list.
      *
      * @param ServerRequestInterface $request
@@ -277,7 +258,7 @@ class RecordListController
         $this->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/Backend/AjaxDataHandler');
         $calcPerms = $backendUser->calcPerms($this->pageinfo);
         $userCanEditPage = $calcPerms & Permission::PAGE_EDIT && !empty($this->id) && ($backendUser->isAdmin() || (int)$this->pageinfo['editlock'] === 0);
-        $pageActionsCallback = '';
+        $pageActionsCallback = null;
         if ($userCanEditPage) {
             $pageActionsCallback = 'function(PageActions) {
                 PageActions.setPageId(' . (int)$this->id . ');
@@ -306,6 +287,7 @@ class RecordListController
         // Initialize the dblist object:
         $dblist = GeneralUtility::makeInstance(DatabaseRecordList::class);
         $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
+        $dblist->setModuleData($this->MOD_SETTINGS ?? []);
         $dblist->script = (string)$uriBuilder->buildUriFromRoute('web_list');
         $dblist->calcPerms = $calcPerms;
         $dblist->thumbs = $backendUser->uc['thumbnailsByDefault'];
@@ -390,15 +372,13 @@ class RecordListController
                 'RecordListInlineJS',
                 '
 				function jumpExt(URL,anchor) {
+					console.warn(\'jumpExt() has been marked as deprecated. Consider using regular links instead.\');
 					var anc = anchor?anchor:"";
 					window.location.href = URL+(T3_THIS_LOCATION?"&returnUrl="+T3_THIS_LOCATION:"")+anc;
 					return false;
 				}
-				function jumpSelf(URL) {
-					window.location.href = URL+(T3_RETURN_URL?"&returnUrl="+T3_RETURN_URL:"");
-					return false;
-				}
 				function jumpToUrl(URL) {
+					console.warn(\'jumpToUrl() has been marked as deprecated. Consider using regular links or window.location.href instead.\');
 					window.location.href = URL;
 					return false;
 				}
@@ -590,10 +570,7 @@ class RecordListController
         $this->site = $request->getAttribute('site');
         $this->siteLanguages = $this->site->getAvailableLanguages($this->getBackendUserAuthentication(), false, (int)$this->id);
         BackendUtility::lockRecords();
-        // @deprecated  since TYPO3 v9, will be removed in TYPO3 v10.0. Can be removed along with $this->doc. Still used in DatabaseRecordList
-        $GLOBALS['SOBE'] = $this;
         $this->init();
-        $this->clearCache();
         $this->main($request);
         $this->moduleTemplate->setContent($this->content);
         return new HtmlResponse($this->moduleTemplate->renderContent());

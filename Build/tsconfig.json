@@ -1,11 +1,14 @@
 {
     "compilerOptions": {
-        "target": "es5",
+        "target": "es6",
         "lib": [
             "dom",
-            "es5",
             "scripthost",
-            "es6"
+            "es6",
+            "es7",
+            "es2017",
+            "es2018",
+            "es2019"
         ],
         "module": "amd",
         "sourceMap": false,
@@ -78,6 +81,10 @@
             "TYPO3/CMS/Recycler/*": [
                 "../typo3/sysext/recycler/Resources/Public/JavaScript/*",
                 "recycler/Resources/Public/TypeScript/*"
+            ],
+            "TYPO3/CMS/Redirects/*": [
+                "../typo3/sysext/redirects/Resources/Public/JavaScript/*",
+                "redirects/Resources/Public/TypeScript/*"
             ],
             "TYPO3/CMS/RteCkeditor/*": [
                 "../typo3/sysext/rte_ckeditor/Resources/Public/JavaScript/*",

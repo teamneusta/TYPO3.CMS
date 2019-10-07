@@ -1,5 +1,6 @@
 <?php
 declare(strict_types = 1);
+
 namespace TYPO3\CMS\Core\Console;
 
 /*
@@ -25,6 +26,8 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Command Line Interface Request Handler dealing with registered commands.
+ *
+ * @deprecated since TYPO3 v10.1, will be removed in TYPO3 v11.0, as everything is handled by the CommandApplication directly.
  */
 class CommandRequestHandler implements RequestHandlerInterface
 {
@@ -39,7 +42,12 @@ class CommandRequestHandler implements RequestHandlerInterface
      */
     public function __construct()
     {
-        $this->application = new Application('TYPO3 CMS', TYPO3_version);
+        trigger_error('CommandRequestHandler will be removed in TYPO3 v11.0, as CLI is executed inside the CommandApplication directly.', E_USER_DEPRECATED);
+        $this->application = new Application('TYPO3 CMS', sprintf(
+            '%s (Application Context: <comment>%s</comment>)',
+            TYPO3_version,
+            GeneralUtility::getApplicationContext()
+        ));
     }
 
     /**

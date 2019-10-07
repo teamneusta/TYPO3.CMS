@@ -442,7 +442,8 @@ class GraphicalFunctions
      * @param resource $im GDlib image pointer
      * @param array $conf TypoScript array with configuration for the GIFBUILDER object.
      * @param array $workArea The current working area coordinates.
-     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make(), maskImageOntoImage()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make()
+     * @see maskImageOntoImage()
      */
     public function copyImageOntoImage(&$im, $conf, $workArea)
     {
@@ -722,7 +723,8 @@ class GraphicalFunctions
      * @param array $conf TypoScript array for the TEXT GIFBUILDER object
      * @return array Array with three keys [0]/[1] being x/y and [2] being the bounding box array
      * @internal
-     * @see txtPosition(), \TYPO3\CMS\Frontend\Imaging\GifBuilder::start()
+     * @see txtPosition()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::start()
      */
     public function calcBBox($conf)
     {
@@ -805,7 +807,8 @@ class GraphicalFunctions
      * @param array $cords Coordinates for a polygon image map as created by ->calcTextCordsForMap()
      * @param array $conf Configuration for "imgMap." property of a TEXT GIFBUILDER object.
      * @internal
-     * @see makeText(), calcTextCordsForMap()
+     * @see makeText()
+     * @see calcTextCordsForMap()
      */
     public function addToMap($cords, $conf)
     {
@@ -824,7 +827,8 @@ class GraphicalFunctions
      * @param array $conf Configuration for "imgMap." property of a TEXT GIFBUILDER object.
      * @return array
      * @internal
-     * @see makeText(), calcTextCordsForMap()
+     * @see makeText()
+     * @see calcTextCordsForMap()
      */
     public function calcTextCordsForMap($cords, $offset, $conf)
     {
@@ -1303,7 +1307,8 @@ class GraphicalFunctions
      * @param array $conf TypoScript array with configuration for the GIFBUILDER object.
      * @param array $workArea The current working area coordinates.
      * @param array $txtConf TypoScript array with configuration for the associated TEXT GIFBUILDER object.
-     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make(), makeText()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make()
+     * @see makeText()
      */
     public function makeOutline(&$im, $conf, $workArea, $txtConf)
     {
@@ -1361,7 +1366,8 @@ class GraphicalFunctions
      * @param array $conf TypoScript array with configuration for the GIFBUILDER object.
      * @param array $workArea The current working area coordinates.
      * @param array $txtConf TypoScript array with configuration for the associated TEXT GIFBUILDER object.
-     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make(), makeShadow()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make()
+     * @see makeShadow()
      */
     public function makeEmboss(&$im, $conf, $workArea, $txtConf)
     {
@@ -1383,7 +1389,9 @@ class GraphicalFunctions
      * @param array $conf TypoScript array with configuration for the GIFBUILDER object.
      * @param array $workArea The current working area coordinates.
      * @param array $txtConf TypoScript array with configuration for the associated TEXT GIFBUILDER object.
-     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make(), makeText(), makeEmboss()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make()
+     * @see makeText()
+     * @see makeEmboss()
      */
     public function makeShadow(&$im, $conf, $workArea, $txtConf)
     {
@@ -1540,7 +1548,8 @@ class GraphicalFunctions
      *
      * @param resource $im GDlib image pointer
      * @param array $conf TypoScript array with configuration for the GIFBUILDER object.
-     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make(), applyImageMagickToPHPGif()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make()
+     * @see applyImageMagickToPHPGif()
      */
     public function makeEffect(&$im, $conf)
     {
@@ -1633,7 +1642,10 @@ class GraphicalFunctions
      *
      * @param resource $im GDlib image pointer
      * @param array $conf TypoScript array with configuration for the GIFBUILDER object.
-     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make(), autoLevels(), outputLevels(), inputLevels()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::make()
+     * @see autoLevels()
+     * @see outputLevels()
+     * @see inputLevels()
      */
     public function adjust(&$im, $conf)
     {
@@ -1875,7 +1887,9 @@ class GraphicalFunctions
      *
      * @param int $factor The sharpening factor, 0-100 (effectively in 10 steps)
      * @return string The sharpening command, eg. " -sharpen 3x4
-     * @see makeText(), IMparams(), v5_blur()
+     * @see makeText()
+     * @see IMparams()
+     * @see v5_blur()
      */
     public function v5_sharpen($factor)
     {
@@ -1894,7 +1908,9 @@ class GraphicalFunctions
      *
      * @param int $factor The blurring factor, 0-100 (effectively in 10 steps)
      * @return string The blurring command, eg. " -blur 3x4
-     * @see makeText(), IMparams(), v5_sharpen()
+     * @see makeText()
+     * @see IMparams()
+     * @see v5_sharpen()
      */
     public function v5_blur($factor)
     {
@@ -1947,12 +1963,12 @@ class GraphicalFunctions
         $cParts = explode(':', $string, 2);
         // Finding the RGB definitions of the color:
         $string = $cParts[0];
-        if (strstr($string, '#')) {
+        if (strpos($string, '#') !== false) {
             $string = preg_replace('/[^A-Fa-f0-9]*/', '', $string);
             $col[] = hexdec(substr($string, 0, 2));
             $col[] = hexdec(substr($string, 2, 2));
             $col[] = hexdec(substr($string, 4, 2));
-        } elseif (strstr($string, ',')) {
+        } elseif (strpos($string, ',') !== false) {
             $string = preg_replace('/[^,0-9]*/', '', $string);
             $strArr = explode(',', $string);
             $col[] = (int)$strArr[0];
@@ -1992,7 +2008,9 @@ class GraphicalFunctions
      * @param array $BB BB (Bounding box) array. Not just used for TEXT objects but also for others
      * @return array [0]=x, [1]=y, [2]=w, [3]=h
      * @internal
-     * @see copyGifOntoGif(), makeBox(), crop()
+     * @see copyGifOntoGif()
+     * @see makeBox()
+     * @see crop()
      */
     public function objPosition($conf, $workArea, $BB)
     {
@@ -2048,7 +2066,11 @@ class GraphicalFunctions
      * @param array $options An array with options passed to getImageScale (see this function).
      * @param bool $mustCreate If set, then another image than the input imagefile MUST be returned. Otherwise you can risk that the input image is good enough regarding messures etc and is of course not rendered to a new, temporary file in typo3temp/. But this option will force it to.
      * @return array|null [0]/[1] is w/h, [2] is file extension and [3] is the filename.
-     * @see getImageScale(), typo3/show_item.php, fileList_ext::renderImage(), \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::getImgResource(), SC_tslib_showpic::show(), maskImageOntoImage(), copyImageOntoImage(), scale()
+     * @see getImageScale()
+     * @see \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::getImgResource()
+     * @see maskImageOntoImage()
+     * @see copyImageOntoImage()
+     * @see scale()
      */
     public function imageMagickConvert($imagefile, $newExt = '', $w = '', $h = '', $params = '', $frame = '', $options = [], $mustCreate = false)
     {
@@ -2157,7 +2179,8 @@ class GraphicalFunctions
      *
      * @param string $imageFile The image filepath
      * @return array|null Returns an array where [0]/[1] is w/h, [2] is extension and [3] is the filename.
-     * @see imageMagickConvert(), \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::getImgResource()
+     * @see imageMagickConvert()
+     * @see \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::getImgResource()
      */
     public function getImageDimensions($imageFile)
     {
@@ -2283,12 +2306,8 @@ class GraphicalFunctions
      */
     public function getImageScale($info, $w, $h, $options)
     {
-        if (strstr($w . $h, 'm')) {
-            $max = 1;
-        } else {
-            $max = 0;
-        }
-        if (strstr($w . $h, 'c')) {
+        $max = strpos($w . $h, 'm') !== false ? 1 : 0;
+        if (strpos($w . $h, 'c') !== false) {
             $out['cropH'] = (int)substr(strstr($w, 'c'), 1);
             $out['cropV'] = (int)substr(strstr($h, 'c'), 1);
             $crs = true;
@@ -2720,7 +2739,9 @@ class GraphicalFunctions
      * @param string $theImage The filename to write to
      * @param int $quality The image quality (for JPEGs)
      * @return bool The output of either imageGif, imagePng or imageJpeg based on the filename to write
-     * @see maskImageOntoImage(), scale(), output()
+     * @see maskImageOntoImage()
+     * @see scale()
+     * @see output()
      */
     public function ImageWrite($destImg, $theImage, $quality = 0)
     {

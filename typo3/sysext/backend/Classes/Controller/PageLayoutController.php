@@ -29,20 +29,21 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\Restriction\BackendWorkspaceRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
-use TYPO3\CMS\Core\DataHandling\DataHandler;
+use TYPO3\CMS\Core\Database\Query\Restriction\WorkspaceRestriction;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Site\Entity\SiteInterface;
+use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Versioning\VersionState;
 use TYPO3\CMS\Fluid\View\StandaloneView;
 use TYPO3\CMS\Fluid\ViewHelpers\Be\InfoboxViewHelper;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * Script Class for Web > Layout module
@@ -98,13 +99,6 @@ class PageLayoutController
      * @var string
      */
     protected $returnUrl;
-
-    /**
-     * Clear-cache flag - if set, clears page cache for current id.
-     *
-     * @var bool
-     */
-    protected $clear_cache;
 
     /**
      * PopView id - for opening a window with the page
@@ -254,6 +248,11 @@ class PageLayoutController
     protected $searchContent;
 
     /**
+     * @var SiteLanguage[]
+     */
+    protected $availableLanguages;
+
+    /**
      * Injects the request object for the current request or subrequest
      * As this controller goes only through the main() method, it is rather simple for now
      *
@@ -264,7 +263,6 @@ class PageLayoutController
     {
         $GLOBALS['SOBE'] = $this;
         $this->init($request);
-        $this->clearCache();
         $this->main($request);
         return new HtmlResponse($this->moduleTemplate->renderContent());
     }
@@ -293,7 +291,6 @@ class PageLayoutController
         $this->id = (int)($parsedBody['id'] ?? $queryParams['id'] ?? 0);
         $this->pointer = $parsedBody['pointer'] ?? $queryParams['pointer'] ?? null;
         $this->imagemode = $parsedBody['imagemode'] ?? $queryParams['imagemode'] ?? null;
-        $this->clear_cache = $parsedBody['clear_cache'] ?? $queryParams['clear_cache'] ?? null;
         $this->popView = $parsedBody['popView'] ?? $queryParams['popView'] ?? null;
         $this->search_field = $parsedBody['search_field'] ?? $queryParams['search_field'] ?? null;
         $this->search_levels = $parsedBody['search_levels'] ?? $queryParams['search_levels'] ?? null;
@@ -326,7 +323,7 @@ class PageLayoutController
 
         /** @var SiteInterface $currentSite */
         $currentSite = $request->getAttribute('site');
-        $availableLanguages = $currentSite->getAvailableLanguages($this->getBackendUser(), false, $this->id);
+        $this->availableLanguages = $currentSite->getAvailableLanguages($this->getBackendUser(), false, $this->id);
 
         $lang = $this->getLanguageService();
         // MENU-ITEMS:
@@ -364,13 +361,13 @@ class PageLayoutController
                 )->execute();
             while ($pageTranslation = $statement->fetch()) {
                 $languageId = $pageTranslation[$GLOBALS['TCA']['pages']['ctrl']['languageField']];
-                if (isset($availableLanguages[$languageId])) {
-                    $this->MOD_MENU['language'][$languageId] = $availableLanguages[$languageId]->getTitle();
+                if (isset($this->availableLanguages[$languageId])) {
+                    $this->MOD_MENU['language'][$languageId] = $this->availableLanguages[$languageId]->getTitle();
                 }
             }
             // Override the label
-            if (isset($availableLanguages[0])) {
-                $this->MOD_MENU['language'][0] = $availableLanguages[0]->getTitle();
+            if (isset($this->availableLanguages[0])) {
+                $this->MOD_MENU['language'][0] = $this->availableLanguages[0]->getTitle();
             }
         }
         // Initialize the available actions
@@ -396,24 +393,13 @@ class PageLayoutController
     protected function initActions(): array
     {
         $actions = [
-            1 => $this->getLanguageService()->getLL('m_function_1'),
-            2 => $this->getLanguageService()->getLL('m_function_2')
+            1 => $this->getLanguageService()->getLL('m_function_1')
         ];
-        // Find if there are ANY languages at all (and if not, remove the language option from function menu).
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('sys_language');
-        if ($this->getBackendUser()->isAdmin()) {
-            $queryBuilder->getRestrictions()->removeAll();
+        // Find if there are ANY languages at all (and if not, do not show the language option from function menu).
+        if (count($this->availableLanguages) > 1) {
+            $actions[2] = $this->getLanguageService()->getLL('m_function_2');
         }
-
-        $count = $queryBuilder
-            ->count('uid')
-            ->from('sys_language')
-            ->execute()
-            ->fetchColumn(0);
-
-        if (!$count) {
-            unset($actions['2']);
-        }
+        $this->makeLanguageMenu();
         // Page / user TSconfig blinding of menu-items
         $blindActions = $this->modTSconfig['properties']['menu.']['functions.'] ?? [];
         foreach ($blindActions as $key => $value) {
@@ -464,18 +450,6 @@ class PageLayoutController
     }
 
     /**
-     * Clears page cache for the current id, $this->id
-     */
-    protected function clearCache(): void
-    {
-        if ($this->clear_cache && !empty($this->pageinfo)) {
-            $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-            $dataHandler->start([], []);
-            $dataHandler->clear_cacheCmd($this->id);
-        }
-    }
-
-    /**
      * Generate the flashmessages for current pid
      *
      * @return string HTML content with flashmessages
@@ -508,48 +482,54 @@ class PageLayoutController
             $shortcutMode = (int)$this->pageinfo['shortcut_mode'];
             $pageRepository = GeneralUtility::makeInstance(PageRepository::class);
             $targetPage = [];
+            $message = '';
+            $state = InfoboxViewHelper::STATE_ERROR;
 
-            if ($this->pageinfo['shortcut'] || $shortcutMode) {
+            if ($shortcutMode || $this->pageinfo['shortcut']) {
                 switch ($shortcutMode) {
                     case PageRepository::SHORTCUT_MODE_NONE:
-                        $targetPage = $pageRepository->getPage($this->pageinfo['shortcut']);
+                        $targetPage = $this->getTargetPageIfVisible($pageRepository->getPage($this->pageinfo['shortcut']));
+                        $message .= $targetPage === [] ? $lang->getLL('pageIsMisconfiguredOrNotAccessibleInternalLinkMessage') : '';
                         break;
                     case PageRepository::SHORTCUT_MODE_FIRST_SUBPAGE:
-                        $targetPage = reset($pageRepository->getMenu($this->pageinfo['shortcut'] ?: $this->pageinfo['uid']));
+                        $menuOfPages = $pageRepository->getMenu($this->pageinfo['uid'], '*', 'sorting', 'AND hidden = 0');
+                        $targetPage = reset($menuOfPages) ?: [];
+                        $message .= $targetPage === [] ? $lang->getLL('pageIsMisconfiguredFirstSubpageMessage') : '';
                         break;
                     case PageRepository::SHORTCUT_MODE_PARENT_PAGE:
-                        $targetPage = $pageRepository->getPage($this->pageinfo['pid']);
+                        $targetPage = $this->getTargetPageIfVisible($pageRepository->getPage($this->pageinfo['pid']));
+                        $message .= $targetPage === [] ? $lang->getLL('pageIsMisconfiguredParentPageMessage') : '';
+                        break;
+                    case PageRepository::SHORTCUT_MODE_RANDOM_SUBPAGE:
+                        $possibleTargetPages = $pageRepository->getMenu($this->pageinfo['uid'], '*', 'sorting', 'AND hidden = 0');
+                        if ($possibleTargetPages === []) {
+                            $message .= $lang->getLL('pageIsMisconfiguredOrNotAccessibleRandomInternalLinkMessage');
+                            break;
+                        }
+                        $message = $lang->getLL('pageIsRandomInternalLinkMessage');
+                        $state = InfoboxViewHelper::STATE_INFO;
                         break;
                 }
-
-                $message = '';
-                if ($shortcutMode === PageRepository::SHORTCUT_MODE_RANDOM_SUBPAGE) {
-                    $message .= sprintf($lang->getLL('pageIsRandomInternalLinkMessage'));
-                } else {
+                $message = htmlspecialchars($message);
+                if ($targetPage !== [] && $shortcutMode !== PageRepository::SHORTCUT_MODE_RANDOM_SUBPAGE) {
                     $linkToPid = $this->local_linkThisScript(['id' => $targetPage['uid']]);
                     $path = BackendUtility::getRecordPath($targetPage['uid'], $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW), 1000);
                     $linkedPath = '<a href="' . htmlspecialchars($linkToPid) . '">' . htmlspecialchars($path) . '</a>';
-                    $message .= sprintf($lang->getLL('pageIsInternalLinkMessage'), $linkedPath);
+                    $message .= sprintf(htmlspecialchars($lang->getLL('pageIsInternalLinkMessage')), $linkedPath);
+                    $message .= ' (' . htmlspecialchars($lang->sL(BackendUtility::getLabelFromItemlist('pages', 'shortcut_mode', $shortcutMode))) . ')';
+                    $state = InfoboxViewHelper::STATE_INFO;
                 }
-
-                $message .= ' (' . htmlspecialchars($lang->sL(BackendUtility::getLabelFromItemlist('pages', 'shortcut_mode', $shortcutMode))) . ')';
-
-                $view->assignMultiple([
-                    'title' => $this->pageinfo['title'],
-                    'message' => $message,
-                    'state' => InfoboxViewHelper::STATE_INFO
-                ]);
-                $content .= $view->render();
             } else {
-                if (empty($targetPage) && $shortcutMode !== PageRepository::SHORTCUT_MODE_RANDOM_SUBPAGE) {
-                    $view->assignMultiple([
-                        'title' => $this->pageinfo['title'],
-                        'message' => $lang->getLL('pageIsMisconfiguredInternalLinkMessage'),
-                        'state' => InfoboxViewHelper::STATE_ERROR
-                    ]);
-                    $content .= $view->render();
-                }
+                $message = htmlspecialchars($lang->getLL('pageIsMisconfiguredInternalLinkMessage'));
+                $state = InfoboxViewHelper::STATE_ERROR;
             }
+
+            $view->assignMultiple([
+                'title' => $this->pageinfo['title'],
+                'message' => $message,
+                'state' => $state
+            ]);
+            $content .= $view->render();
         } elseif ($this->pageinfo['doktype'] === PageRepository::DOKTYPE_LINK) {
             if (empty($this->pageinfo['url'])) {
                 $view->assignMultiple([
@@ -561,7 +541,7 @@ class PageLayoutController
             } else {
                 $externalUrl = htmlspecialchars(GeneralUtility::makeInstance(PageRepository::class)->getExtURL($this->pageinfo));
                 if ($externalUrl !== false) {
-                    $externalUrlHtml = '<a href="' . $externalUrl . '" target="_blank" rel="noopener">' . $externalUrl . '</a>';
+                    $externalUrlHtml = '<a href="' . $externalUrl . '" target="_blank" rel="noopener noreferrer">' . $externalUrl . '</a>';
                     $view->assignMultiple([
                         'title' => $this->pageinfo['title'],
                         'message' => sprintf($lang->getLL('pageIsExternalLinkMessage'), $externalUrlHtml),
@@ -670,6 +650,7 @@ class PageLayoutController
      */
     protected function main(ServerRequestInterface $request): void
     {
+        $this->moduleTemplate->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/Recordlist/ClearCache');
         $lang = $this->getLanguageService();
         // Access check...
         // The page will show only if there is a valid page and if this page may be viewed by the user
@@ -725,7 +706,7 @@ class PageLayoutController
 
             // Render the primary module content:
             if ($this->MOD_SETTINGS['function'] == 1 || $this->MOD_SETTINGS['function'] == 2) {
-                $content .= '<form action="' . htmlspecialchars((string)$uriBuilder->buildUriFromRoute($this->moduleName, ['id' => $this->id, 'imagemode' =>  $this->imagemode])) . '" id="PageLayoutController" method="post">';
+                $content .= '<form action="' . htmlspecialchars((string)$uriBuilder->buildUriFromRoute($this->moduleName, ['id' => $this->id, 'imagemode' => $this->imagemode])) . '" id="PageLayoutController" method="post">';
                 // Page title
                 $content .= '<h1 class="t3js-title-inlineedit">' . htmlspecialchars($this->getLocalizedPageTitle()) . '</h1>';
                 // All other listings
@@ -921,8 +902,17 @@ class PageLayoutController
         $lang = $this->getLanguageService();
         // View page
         if (!VersionState::cast($this->pageinfo['t3ver_state'])->equals(VersionState::DELETE_PLACEHOLDER)) {
+            $languageParameter = $this->current_sys_language ? ('&L=' . $this->current_sys_language) : '';
+            $onClick = BackendUtility::viewOnClick(
+                $this->pageinfo['uid'],
+                '',
+                BackendUtility::BEgetRootLine($this->pageinfo['uid']),
+                '',
+                '',
+                $languageParameter
+            );
             $viewButton = $this->buttonBar->makeLinkButton()
-                ->setOnClick(BackendUtility::viewOnClick($this->pageinfo['uid'], '', BackendUtility::BEgetRootLine($this->pageinfo['uid'])))
+                ->setOnClick($onClick)
                 ->setTitle($lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.showPage'))
                 ->setIcon($this->iconFactory->getIcon('actions-view-page', Icon::SIZE_SMALL))
                 ->setHref('#');
@@ -949,7 +939,9 @@ class PageLayoutController
         // Cache
         if (empty($this->modTSconfig['properties']['disableAdvanced'])) {
             $clearCacheButton = $this->buttonBar->makeLinkButton()
-                ->setHref((string)$uriBuilder->buildUriFromRoute($this->moduleName, ['id' => $this->pageinfo['uid'], 'clear_cache' => '1']))
+                ->setHref('#')
+                ->setDataAttributes(['id' => $this->pageinfo['uid']])
+                ->setClasses('t3js-clear-page-cache')
                 ->setTitle($lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.clear_cache'))
                 ->setIcon($this->iconFactory->getIcon('actions-system-cache-clear', Icon::SIZE_SMALL));
             $this->buttonBar->addButton($clearCacheButton, ButtonBar::BUTTON_POSITION_RIGHT, 1);
@@ -1235,34 +1227,37 @@ class PageLayoutController
      */
     protected function currentPageHasSubPages(): bool
     {
+        // get workspace id
+        $workspaceId = (int)$this->getBackendUser()->workspace;
+
         /** @var QueryBuilder $queryBuilder */
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
         $queryBuilder->getRestrictions()
             ->removeAll()
             ->add(GeneralUtility::makeInstance(DeletedRestriction::class))
-            ->add(GeneralUtility::makeInstance(BackendWorkspaceRestriction::class));
-
-        // get workspace id
-        $workspaceId = (int)$this->getBackendUser()->workspace;
-        $comparisonExpression = $workspaceId === 0 ? 'neq' : 'eq';
+            ->add(GeneralUtility::makeInstance(WorkspaceRestriction::class, $workspaceId));
 
         $count = $queryBuilder
             ->count('uid')
             ->from('pages')
             ->where(
-                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($this->id, \PDO::PARAM_INT)),
-                $queryBuilder->expr()->eq(
-                    't3ver_wsid',
-                    $queryBuilder->createNamedParameter($workspaceId, \PDO::PARAM_INT)
-                ),
-                $queryBuilder->expr()->{$comparisonExpression}(
-                    'pid',
-                    $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
-                )
+                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($this->id, \PDO::PARAM_INT))
             )
             ->execute()
             ->fetchColumn(0);
 
         return (bool)$count;
+    }
+
+    /**
+     * Returns the target page if visible
+     *
+     * @param array $targetPage
+     *
+     * @return array
+     */
+    protected function getTargetPageIfVisible(array $targetPage): array
+    {
+        return !(bool)($targetPage['hidden'] ?? false) ? $targetPage : [];
     }
 }

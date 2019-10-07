@@ -33,7 +33,8 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * @TODO: updated and the whole API is better defined. There are some known bugs
  * @TODO: in this library. Further it would be nice with a facility to not only
  * @TODO: analyze but also clean up!
- * @see \TYPO3\CMS\Lowlevel\Controller\DatabaseIntegrityController::func_relations(), \TYPO3\CMS\Lowlevel\Controller\DatabaseIntegrityController::func_records()
+ * @see \TYPO3\CMS\Lowlevel\Controller\DatabaseIntegrityController::func_relations()
+ * @see \TYPO3\CMS\Lowlevel\Controller\DatabaseIntegrityController::func_records()
  */
 class DatabaseIntegrityCheck
 {
@@ -130,7 +131,6 @@ class DatabaseIntegrityCheck
         if ($versions) {
             $queryBuilder->addSelect('t3ver_wsid', 't3ver_count');
             $queryBuilder->where(
-                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)),
                 $queryBuilder->expr()->eq('t3ver_oid', $queryBuilder->createNamedParameter($theID, \PDO::PARAM_INT))
             );
         } else {
@@ -199,7 +199,6 @@ class DatabaseIntegrityCheck
         // Select all records from table pointing to this page
         if ($versions) {
             $queryBuilder->where(
-                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)),
                 $queryBuilder->expr()->eq('t3ver_oid', $queryBuilder->createNamedParameter($theID, \PDO::PARAM_INT))
             );
         } else {
@@ -221,7 +220,7 @@ class DatabaseIntegrityCheck
                 $this->recStats['published_versions'][$table][$newID] = $newID;
             }
             // Select all versions of this record:
-            if ($this->genTreeIncludeVersions && $GLOBALS['TCA'][$table]['ctrl']['versioningWS']) {
+            if ($this->genTreeIncludeVersions && BackendUtility::isTableWorkspaceEnabled($table)) {
                 $this->genTree_records($newID, '', $table, true);
             }
         }
@@ -400,7 +399,7 @@ class DatabaseIntegrityCheck
             $cols = $GLOBALS['TCA'][$table]['columns'];
             foreach ($cols as $field => $config) {
                 if ($config['config']['type'] === 'group' && $config['config']['internal_type'] === 'db') {
-                    if (trim($config['config']['allowed']) === '*' || strstr($config['config']['allowed'], $theSearchTable)) {
+                    if (trim($config['config']['allowed']) === '*' || strpos($config['config']['allowed'], $theSearchTable) !== false) {
                         $result[] = [$table, $field];
                     }
                 } elseif ($config['config']['type'] === 'select' && $config['config']['foreign_table'] == $theSearchTable) {

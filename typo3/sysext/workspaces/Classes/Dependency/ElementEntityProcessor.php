@@ -93,6 +93,10 @@ class ElementEntityProcessor
      */
     public function createNewDependentElementChildReferenceCallback(array $callerArguments, array $targetArgument, ElementEntity $caller, $eventName)
     {
+        // skip children in case ancestor is invalid
+        if ($caller->isInvalid()) {
+            return ElementEntity::RESPONSE_Skip;
+        }
         $fieldConfiguration = BackendUtility::getTcaFieldConfiguration($caller->getTable(), $callerArguments['field']);
         $inlineFieldType = $this->getDataHandler()->getInlineFieldType($fieldConfiguration);
         if (!$fieldConfiguration || ($fieldConfiguration['type'] !== 'flex' && $inlineFieldType !== 'field' && $inlineFieldType !== 'list')) {
@@ -189,18 +193,26 @@ class ElementEntityProcessor
                 1393960943
             );
         }
-        // If version is on live workspace, but the pid is negative, mark the record as invalid.
+
+        $deleteFieldName = $GLOBALS['TCA'][$caller->getTable()]['ctrl']['delete'] ?? null;
+        // If version is on live workspace, but an "offline" ID is set, mark the record as invalid.
         // This happens if a change has been discarded (clearWSID) - it will be removed from the command map.
-        if ((int)$versionRecord['t3ver_wsid'] === 0 && (int)$versionRecord['pid'] === -1) {
+        if (
+            (int)$versionRecord['t3ver_oid'] > 0 && (
+                (int)$versionRecord['t3ver_wsid'] === 0 // behavior prior to v10.1 (backward compatibility)
+                || !empty($deleteFieldName) && (int)$versionRecord['t3ver_wsid'] === $this->getWorkspace()
+                    && (int)$versionRecord[$deleteFieldName] > 0 // behavior since v10.1
+            )
+        ) {
             $caller->setDataValue('liveId', $caller->getId());
             $caller->setInvalid(true);
             return;
         }
         if ($caller->hasDataValue('liveId') === false) {
             // Set the original uid from the version record
-            if (!empty($versionRecord['t3ver_oid']) && (int)$versionRecord['pid'] === -1 && (int)$versionRecord['t3ver_wsid'] === $this->getWorkspace()) {
+            if (!empty($versionRecord['t3ver_oid']) && (int)$versionRecord['t3ver_wsid'] === $this->getWorkspace()) {
                 $caller->setDataValue('liveId', $versionRecord['t3ver_oid']);
-            } elseif ((int)$versionRecord['t3ver_wsid'] === 0 || (int)$versionRecord['pid'] !== -1) {
+            } elseif ((int)$versionRecord['t3ver_wsid'] === 0 || (int)$versionRecord['t3ver_oid'] === 0) {
                 // The current version record is actually a live record or an accordant placeholder for live
                 $caller->setDataValue('liveId', $caller->getId());
                 $versionRecord = BackendUtility::getWorkspaceVersionOfRecord(

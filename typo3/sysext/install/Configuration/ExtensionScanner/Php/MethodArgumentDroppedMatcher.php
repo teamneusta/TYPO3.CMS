@@ -235,4 +235,16 @@ return [
             'Deprecation-88567-GLOBALS_LOCAL_LANG.rst',
         ],
     ],
+    'TYPO3\CMS\IndexedSearch\Indexer->backend_initIndexer' => [
+        'maximumNumberOfArguments' => 5,
+        'restFiles' => [
+            'Breaking-88741-CHashCalculationInIndexedSearchRemoved.rst',
+        ],
+    ],
+    'TYPO3\CMS\Core\Resource\ResourceCompressor->concatenateCssFiles' => [
+        'maximumNumberOfArguments' => 1,
+        'restFiles' => [
+            'Breaking-88758-SelectiveConcatenationOfCSSFilesInResourceCompressorRemoved.rst',
+        ],
+    ],
 ];

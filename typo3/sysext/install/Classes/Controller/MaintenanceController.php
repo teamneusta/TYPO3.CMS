@@ -85,6 +85,7 @@ class MaintenanceController extends AbstractController
      */
     public function clearTypo3tempFilesStatsAction(ServerRequestInterface $request): ResponseInterface
     {
+        $this->loadExtLocalconfDatabaseAndExtTables();
         $view = $this->initializeStandaloneView($request, 'Maintenance/ClearTypo3tempFiles.html');
         $formProtection = FormProtectionFactory::get(InstallToolFormProtection::class);
         $view->assignMultiple([
@@ -113,6 +114,7 @@ class MaintenanceController extends AbstractController
      */
     public function clearTypo3tempFilesAction(ServerRequestInterface $request): ResponseInterface
     {
+        $this->loadExtLocalconfDatabaseAndExtTables();
         $messageQueue = new FlashMessageQueue('install');
         $typo3tempFileService = new Typo3tempFileService();
         $folder = $request->getParsedBody()['install']['folder'];
@@ -479,6 +481,7 @@ class MaintenanceController extends AbstractController
         $username = preg_replace('/\\s/i', '', $request->getParsedBody()['install']['userName']);
         $password = $request->getParsedBody()['install']['userPassword'];
         $passwordCheck = $request->getParsedBody()['install']['userPasswordCheck'];
+        $email = $request->getParsedBody()['install']['userEmail'] ?? '';
         $isSystemMaintainer = ((bool)$request->getParsedBody()['install']['userSystemMaintainer'] == '1') ? true : false;
 
         $messages = new FlashMessageQueue('install');
@@ -525,6 +528,9 @@ class MaintenanceController extends AbstractController
                     'tstamp' => $GLOBALS['EXEC_TIME'],
                     'crdate' => $GLOBALS['EXEC_TIME']
                 ];
+                if (GeneralUtility::validEmail($email)) {
+                    $adminUserFields['email'] = $email;
+                }
                 $connectionPool->getConnectionForTable('be_users')->insert('be_users', $adminUserFields);
 
                 if ($isSystemMaintainer) {

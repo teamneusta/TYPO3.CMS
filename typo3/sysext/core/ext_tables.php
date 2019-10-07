@@ -9,15 +9,15 @@ defined('TYPO3_MODE') or die();
  * types, and for every type the entries simply overrides the entries in the 'default' type!
  */
 $GLOBALS['PAGES_TYPES'] = [
-    (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_BE_USER_SECTION => [
+    (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_BE_USER_SECTION => [
         'allowedTables' => '*'
     ],
-    (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_SYSFOLDER => [
+    (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_SYSFOLDER => [
         //  Doktype 254 is a 'Folder' - a general purpose storage folder for whatever you like.
         // In CMS context it's NOT a viewable page. Can contain any element.
         'allowedTables' => '*'
     ],
-    (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_RECYCLER => [
+    (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_RECYCLER => [
         // Doktype 255 is a recycle-bin.
         'allowedTables' => '*'
     ],
@@ -47,40 +47,40 @@ $GLOBALS['TBE_MODULES'] = [
         'web' => [
             'labels' => 'LLL:EXT:core/Resources/Private/Language/locallang_mod_web.xlf',
             'name' => 'web',
-            'iconIdentifier' => 'module-web'
+            'iconIdentifier' => 'modulegroup-web'
         ],
         'site' => [
             'labels' => 'LLL:EXT:core/Resources/Private/Language/locallang_mod_site.xlf',
             'name' => 'site',
             'workspaces' => 'online',
-            'iconIdentifier' => 'module-site',
+            'iconIdentifier' => 'modulegroup-site',
         ],
         'file' => [
             'labels' => 'LLL:EXT:core/Resources/Private/Language/locallang_mod_file.xlf',
             'navigationFrameModule' => 'file_navframe',
             'name' => 'file',
             'workspaces' => 'online,custom',
-            'iconIdentifier' => 'module-file'
+            'iconIdentifier' => 'modulegroup-file'
         ],
         'user' => [
             'labels' => 'LLL:EXT:core/Resources/Private/Language/locallang_mod_usertools.xlf',
             'name' => 'user',
-            'iconIdentifier' => 'status-user-backend'
+            'iconIdentifier' => 'modulegroup-user'
         ],
         'tools' => [
             'labels' => 'LLL:EXT:core/Resources/Private/Language/locallang_mod_admintools.xlf',
             'name' => 'tools',
-            'iconIdentifier' => 'module-tools'
+            'iconIdentifier' => 'modulegroup-tools'
         ],
         'system' => [
             'labels' => 'LLL:EXT:core/Resources/Private/Language/locallang_mod_system.xlf',
             'name' => 'system',
-            'iconIdentifier' => 'module-system'
+            'iconIdentifier' => 'modulegroup-system'
         ],
         'help' => [
             'labels' => 'LLL:EXT:core/Resources/Private/Language/locallang_mod_help.xlf',
             'name' => 'help',
-            'iconIdentifier' => 'module-help'
+            'iconIdentifier' => 'modulegroup-help'
         ]
     ]
 ];

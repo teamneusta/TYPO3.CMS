@@ -95,7 +95,6 @@ class DatabaseIntegrityController
     /**
      * Current settings for the keys of the MOD_MENU array
      *
-     * @see $MOD_MENU
      * @var array
      */
     protected $MOD_SETTINGS = [];
@@ -116,15 +115,6 @@ class DatabaseIntegrityController
 
         $this->menuConfig();
         $this->moduleTemplate = GeneralUtility::makeInstance(ModuleTemplate::class);
-        $this->moduleTemplate->addJavaScriptCode(
-            'jumpToUrl',
-            '
-            function jumpToUrl(URL) {
-                window.location.href = URL;
-                return false;
-            }
-            '
-        );
 
         switch ($this->MOD_SETTINGS['function']) {
             case 'search':

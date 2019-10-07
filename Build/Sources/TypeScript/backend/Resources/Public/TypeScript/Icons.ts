@@ -55,11 +55,13 @@ class Icons {
    * @param {MarkupIdentifiers} markupIdentifier
    * @returns {JQueryPromise<any>}
    */
-  public getIcon(identifier: string,
-                 size: Sizes,
-                 overlayIdentifier?: string,
-                 state?: string,
-                 markupIdentifier?: MarkupIdentifiers): JQueryPromise<any> {
+  public getIcon(
+    identifier: string,
+    size: Sizes,
+    overlayIdentifier?: string,
+    state?: string,
+    markupIdentifier?: MarkupIdentifiers,
+  ): JQueryPromise<any> {
 
     /**
      * Icon keys:
@@ -122,7 +124,7 @@ class Icons {
           icon: JSON.stringify(icon),
         },
         success: (markup: string) => {
-          if (markup.indexOf('t3js-icon') !== -1 && markup.indexOf('<span class="icon-markup">') !== -1) {
+          if (markup.includes('t3js-icon') && markup.includes('<span class="icon-markup">')) {
             ClientStorage.set('icon_' + cacheIdentifier, markup);
           }
           return markup;

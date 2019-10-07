@@ -21,6 +21,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Utility\StringUtility;
 
 /**
@@ -372,7 +373,7 @@ class QueryGenerator
         $this->queryConfig = array(
         array(
         'operator' => 'AND',
-        'type' => 'FIELD_spaceBefore',
+        'type' => 'FIELD_space_before_class',
         ),
         array(
         'operator' => 'AND',
@@ -385,7 +386,7 @@ class QueryGenerator
         'nl' => array(
         array(
         'operator' => 'AND',
-        'type' => 'FIELD_spaceBefore',
+        'type' => 'FIELD_space_before_class',
         'negate' => 1,
         'inputValue' => 'foo foo'
         ),
@@ -825,7 +826,7 @@ class QueryGenerator
                     }
                 }
             }
-            if (stristr($fieldSetup['allowed'], ',')) {
+            if (strpos($fieldSetup['allowed'], ',') !== false) {
                 $from_table_Arr = explode(',', $fieldSetup['allowed']);
                 $useTablePrefix = 1;
                 if (!$fieldSetup['prepend_tname']) {
@@ -835,16 +836,16 @@ class QueryGenerator
                         ->from($table)
                         ->execute();
                     while ($row = $statement->fetch()) {
-                        if (stristr($row[$fieldName], ',')) {
+                        if (strpos($row[$fieldName], ',') !== false) {
                             $checkContent = explode(',', $row[$fieldName]);
                             foreach ($checkContent as $singleValue) {
-                                if (!stristr($singleValue, '_')) {
+                                if (strpos($singleValue, '_') === false) {
                                     $dontPrefixFirstTable = 1;
                                 }
                             }
                         } else {
                             $singleValue = $row[$fieldName];
-                            if ($singleValue !== '' && !stristr($singleValue, '_')) {
+                            if ($singleValue !== '' && strpos($singleValue, '_') === false) {
                                 $dontPrefixFirstTable = 1;
                             }
                         }
@@ -1244,13 +1245,7 @@ class QueryGenerator
         ksort($queryConfig);
         $first = 1;
         foreach ($queryConfig as $key => $conf) {
-            // Convert ISO-8601 timestamp (string) into unix timestamp (int)
-            if (!is_array($conf['inputValue']) && strtotime($conf['inputValue'])) {
-                $conf['inputValue'] = strtotime($conf['inputValue']);
-                if ($conf['inputValue1'] && strtotime($conf['inputValue1'])) {
-                    $conf['inputValue1'] = strtotime($conf['inputValue1']);
-                }
-            }
+            $conf = $this->convertIso8601DatetimeStringToUnixTimestamp($conf);
             switch ($conf['type']) {
                 case 'newlevel':
                     $qs .= LF . $pad . trim($conf['operator']) . ' (' . $this->getQuery(
@@ -1267,6 +1262,40 @@ class QueryGenerator
             $first = 0;
         }
         return $qs;
+    }
+
+    /**
+     * Convert ISO-8601 timestamp (string) into unix timestamp (int)
+     *
+     * @param array $conf
+     * @return array
+     */
+    protected function convertIso8601DatetimeStringToUnixTimestamp(array $conf): array
+    {
+        if ($this->isDateOfIso8601Format($conf['inputValue'])) {
+            $conf['inputValue'] = strtotime($conf['inputValue']);
+            if ($this->isDateOfIso8601Format($conf['inputValue1'])) {
+                $conf['inputValue1'] = strtotime($conf['inputValue1']);
+            }
+        }
+
+        return $conf;
+    }
+
+    /**
+     * Checks if the given value is of the ISO 8601 format.
+     *
+     * @param mixed $date
+     * @return bool
+     */
+    protected function isDateOfIso8601Format($date): bool
+    {
+        if (!is_int($date) && !is_string($date)) {
+            return false;
+        }
+        $format = 'Y-m-d\\TH:i:s\\Z';
+        $formattedDate = \DateTime::createFromFormat($format, $date);
+        return $formattedDate && $formattedDate->format($format) === $date;
     }
 
     /**
@@ -1341,7 +1370,11 @@ class QueryGenerator
             }
         } elseif (!is_array($conf['inputValue' . $suffix]) && strtotime($conf['inputValue' . $suffix])) {
             $inputVal = $conf['inputValue' . $suffix];
+        } elseif (!is_array($conf['inputValue' . $suffix]) && MathUtility::canBeInterpretedAsInteger($conf['inputValue' . $suffix])) {
+            $inputVal = (int)$conf['inputValue' . $suffix];
         } else {
+            // TODO: Six eyes looked at this code and nobody understood completely what is going on here and why we
+            // fallback to float casting, the whole class smells like it needs a refactoring.
             $inputVal = (float)$conf['inputValue' . $suffix];
         }
         return $inputVal;

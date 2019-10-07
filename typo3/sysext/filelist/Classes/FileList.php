@@ -466,7 +466,9 @@ class FileList
                     $table = '_FILE';
                     $elFromTable = $this->clipObj->elFromTable($table);
                     if (!empty($elFromTable) && $this->folderObject->checkActionPermission('write')) {
-                        $addPasteButton = true;
+                        $clipboardMode = $this->clipObj->clipData[$this->clipObj->current]['mode'] ?? '';
+                        $permission = $clipboardMode === 'copy' ? 'copy' : 'move';
+                        $addPasteButton = $this->folderObject->checkActionPermission($permission);
                         $elToConfirm = [];
                         foreach ($elFromTable as $key => $element) {
                             $clipBoardElement = $this->resourceFactory->retrieveFileOrFolderObject($element);
@@ -493,11 +495,17 @@ class FileList
                                 . $this->iconFactory->getIcon('actions-document-paste-into', Icon::SIZE_SMALL)
                                     ->render()
                                 . '</a>';
+                        } else {
+                            $cells[] = $this->spaceIcon;
                         }
                     }
                     if ($this->clipObj->current !== 'normal' && $iOut) {
-                        $cells[] = $this->linkClipboardHeaderIcon('<span title="' . htmlspecialchars($this->getLanguageService()->getLL('clip_selectMarked')) . '">' . $this->iconFactory->getIcon('actions-edit-copy', Icon::SIZE_SMALL)->render() . '</span>', $table, 'setCB');
-                        $cells[] = $this->linkClipboardHeaderIcon('<span title="' . htmlspecialchars($this->getLanguageService()->getLL('clip_deleteMarked')) . '">' . $this->iconFactory->getIcon('actions-edit-delete', Icon::SIZE_SMALL)->render(), $table, 'delete', $this->getLanguageService()->getLL('clip_deleteMarkedWarning'));
+                        if ($this->folderObject->checkActionPermission('copy') && $this->folderObject->checkActionPermission('write') && $this->folderObject->checkActionPermission('move')) {
+                            $cells[] = $this->linkClipboardHeaderIcon('<span title="' . htmlspecialchars($this->getLanguageService()->getLL('clip_selectMarked')) . '">' . $this->iconFactory->getIcon('actions-edit-copy', Icon::SIZE_SMALL)->render() . '</span>', $table, 'setCB');
+                        }
+                        if ($this->folderObject->checkActionPermission('delete')) {
+                            $cells[] = $this->linkClipboardHeaderIcon('<span title="' . htmlspecialchars($this->getLanguageService()->getLL('clip_deleteMarked')) . '">' . $this->iconFactory->getIcon('actions-edit-delete', Icon::SIZE_SMALL)->render(), $table, 'delete', $this->getLanguageService()->getLL('clip_deleteMarkedWarning'));
+                        }
                         $onClick = 'checkOffCB(' . GeneralUtility::quoteJSvalue(implode(',', $this->CBnames)) . ', this); return false;';
                         $cells[] = '<a class="btn btn-default" rel="" href="#" onclick="' . htmlspecialchars($onClick) . '" title="' . htmlspecialchars($this->getLanguageService()->getLL('clip_markRecords')) . '">' . $this->iconFactory->getIcon('actions-document-select', Icon::SIZE_SMALL)->render() . '</a>';
                     }
@@ -687,14 +695,14 @@ class FileList
                 $content = '<a href="' . htmlspecialchars($href) . '">' . $this->iconFactory->getIcon(
                     'actions-move-up',
                     Icon::SIZE_SMALL
-                    )->render() . ' <i>[' . (max(0, $pointer - $this->iLimit) + 1) . ' - ' . $pointer . ']</i></a>';
+                )->render() . ' <i>[' . (max(0, $pointer - $this->iLimit) + 1) . ' - ' . $pointer . ']</i></a>';
                 break;
             case 'rwd':
                 $href = $this->listURL() . '&pointer=' . $pointer . $tParam;
                 $content = '<a href="' . htmlspecialchars($href) . '">' . $this->iconFactory->getIcon(
                     'actions-move-down',
                     Icon::SIZE_SMALL
-                    )->render() . ' <i>[' . ($pointer + 1) . ' - ' . $this->totalItems . ']</i></a>';
+                )->render() . ' <i>[' . ($pointer + 1) . ' - ' . $this->totalItems . ']</i></a>';
                 break;
         }
         return $content;
@@ -793,7 +801,7 @@ class FileList
             $out .= '<span title="' . $title . '">' . $this->iconFactory->getIcon(
                 $this->languageIconTitles[$sys_language_uid]['flagIcon'],
                 Icon::SIZE_SMALL
-                )->render() . '</span>';
+            )->render() . '</span>';
             if (!$addAsAdditionalText) {
                 return $out;
             }
@@ -1241,11 +1249,15 @@ class FileList
                 $cutIcon = $this->iconFactory->getIcon('actions-edit-cut-release', Icon::SIZE_SMALL)->render();
             }
 
-            $cells[] = '<a class="btn btn-default" href="' . htmlspecialchars($this->clipObj->selUrlFile(
-                $fullIdentifier,
-                1,
-                $isSel === 'copy'
-            )) . '" title="' . $copyTitle . '">' . $copyIcon . '</a>';
+            if ($fileOrFolderObject->checkActionPermission('copy')) {
+                $cells[] = '<a class="btn btn-default" href="' . htmlspecialchars($this->clipObj->selUrlFile(
+                    $fullIdentifier,
+                    1,
+                    $isSel === 'copy'
+                )) . '" title="' . $copyTitle . '">' . $copyIcon . '</a>';
+            } else {
+                $cells[] = $this->spaceIcon;
+            }
             // we can only cut if file can be moved
             if ($fileOrFolderObject->checkActionPermission('move')) {
                 $cells[] = '<a class="btn btn-default" href="' . htmlspecialchars($this->clipObj->selUrlFile(
@@ -1266,7 +1278,9 @@ class FileList
         // Display PASTE button, if directory:
         $elFromTable = $this->clipObj->elFromTable('_FILE');
         if ($fileOrFolderObject instanceof Folder && !empty($elFromTable) && $fileOrFolderObject->checkActionPermission('write')) {
-            $addPasteButton = true;
+            $clipboardMode = $this->clipObj->clipData[$this->clipObj->current]['mode'] ?? '';
+            $permission = $clipboardMode === 'copy' ? 'copy' : 'move';
+            $addPasteButton = $this->folderObject->checkActionPermission($permission);
             $elToConfirm = [];
             foreach ($elFromTable as $key => $element) {
                 $clipBoardElement = $this->resourceFactory->retrieveFileOrFolderObject($element);
@@ -1285,6 +1299,8 @@ class FileList
                     . '>'
                     . $this->iconFactory->getIcon('actions-document-paste-into', Icon::SIZE_SMALL)->render()
                     . '</a>';
+            } else {
+                $cells[] = $this->spaceIcon;
             }
         }
         // Compile items into a DIV-element:
@@ -1537,13 +1553,13 @@ class FileList
             if ($launchViewParameter !== '') {
                 $htmlCode .= ' onclick="' . htmlspecialchars(
                     'top.TYPO3.InfoWindow.showItem(' . $launchViewParameter . '); return false;'
-                    ) . '"';
+                ) . '"';
             }
             $htmlCode .= ' title="' . htmlspecialchars(
                 $this->getLanguageService()->sL(
                     'LLL:EXT:backend/Resources/Private/Language/locallang.xlf:show_references'
-                    ) . ' (' . $references . ')'
-                ) . '">';
+                ) . ' (' . $references . ')'
+            ) . '">';
             $htmlCode .= $references;
             $htmlCode .= '</a>';
         }

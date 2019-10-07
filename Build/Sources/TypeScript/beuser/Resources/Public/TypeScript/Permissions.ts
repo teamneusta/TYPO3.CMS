@@ -59,13 +59,6 @@ class Permissions {
   }
 
   /**
-   * wrapper function to call a URL in the current frame
-   */
-  public jumpToUrl = (url: string): void => {
-    window.location.href = url;
-  }
-
-  /**
    * Changes permissions by sending an AJAX request to the server
    */
   public setPermissions = ($element: JQuery): void => {
@@ -242,7 +235,7 @@ class Permissions {
   /**
    * Group-related: Update the HTML view and show the original group
    */
-public restoreGroup = ($element: JQuery): void => {
+  public restoreGroup = ($element: JQuery): void => {
     let page = $element.data('page');
     let groupname = $element.data('groupname');
     let groupnameHtml = groupname;

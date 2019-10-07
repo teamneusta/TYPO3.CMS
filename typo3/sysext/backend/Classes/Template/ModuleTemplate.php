@@ -143,6 +143,11 @@ class ModuleTemplate
     protected $iconFactory;
 
     /**
+     * @var FlashMessageService
+     */
+    protected $flashMessageService;
+
+    /**
      * Module ID
      *
      * @var string
@@ -247,18 +252,25 @@ class ModuleTemplate
      * Class constructor
      * Sets up view and property objects
      *
+     * @param PageRenderer $pageRenderer
+     * @param IconFactory $iconFactory
+     * @param FlashMessageService $flashMessageService
      * @throws InvalidTemplateResourceException In case a template is invalid
      */
-    public function __construct()
-    {
+    public function __construct(
+        PageRenderer $pageRenderer,
+        IconFactory $iconFactory,
+        FlashMessageService $flashMessageService
+    ) {
         $this->view = GeneralUtility::makeInstance(StandaloneView::class);
         $this->view->setPartialRootPaths($this->partialRootPaths);
         $this->view->setTemplateRootPaths($this->templateRootPaths);
         $this->view->setLayoutRootPaths($this->layoutRootPaths);
         $this->view->setTemplate($this->templateFile);
-        $this->pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
+        $this->pageRenderer = $pageRenderer;
+        $this->iconFactory = $iconFactory;
+        $this->flashMessageService = $flashMessageService;
         $this->docHeaderComponent = GeneralUtility::makeInstance(DocHeaderComponent::class);
-        $this->iconFactory = GeneralUtility::makeInstance(IconFactory::class);
     }
 
     /**
@@ -282,11 +294,11 @@ class ModuleTemplate
         if (!empty($GLOBALS['TBE_STYLES']['stylesheet2'])) {
             $this->pageRenderer->addCssFile($GLOBALS['TBE_STYLES']['stylesheet2']);
         }
+        // @see DocumentTemplate::addStyleSheetDirectory
         // Add all *.css files of the directory $path to the stylesheets
         foreach ($this->getRegisteredStylesheetFolders() as $folder) {
             // Read all files in directory and sort them alphabetically
-            $cssFiles = GeneralUtility::getFilesInDir($folder, 'css', true);
-            foreach ($cssFiles as $cssFile) {
+            foreach (GeneralUtility::getFilesInDir($folder, 'css', true) as $cssFile) {
                 $this->pageRenderer->addCssFile($cssFile);
             }
         }
@@ -625,7 +637,6 @@ class ModuleTemplate
      *
      * @param string $thisLocation URL to "this location" / current script
      * @return string Urls are returned as JavaScript variables T3_RETURN_URL and T3_THIS_LOCATION
-     * @see typo3/db_list.php
      * @internal
      */
     public function redirectUrls($thisLocation = '')
@@ -637,7 +648,9 @@ class ModuleTemplate
             'popViewId' => ''
         ]);
         $out = '
+	// @deprecated
 	var T3_RETURN_URL = ' . GeneralUtility::quoteJSvalue(str_replace('%20', '', rawurlencode(GeneralUtility::sanitizeLocalUrl(GeneralUtility::_GP('returnUrl'))))) . ';
+	// @deprecated
 	var T3_THIS_LOCATION = ' . GeneralUtility::quoteJSvalue(str_replace('%20', '', rawurlencode($thisLocation))) . '
 		';
         return $out;
@@ -703,9 +716,7 @@ class ModuleTemplate
     protected function getFlashMessageQueue()
     {
         if (!isset($this->flashMessageQueue)) {
-            /** @var FlashMessageService $service */
-            $service = GeneralUtility::makeInstance(FlashMessageService::class);
-            $this->flashMessageQueue = $service->getMessageQueueByIdentifier();
+            $this->flashMessageQueue = $this->flashMessageService->getMessageQueueByIdentifier();
         }
         return $this->flashMessageQueue;
     }

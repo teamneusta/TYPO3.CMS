@@ -1315,6 +1315,128 @@ class ArrayUtilityTest extends UnitTestCase
         $this->assertEquals($expected, ArrayUtility::flatten($array));
     }
 
+    /**
+     * @return array
+     */
+    public function flattenWithKeepDotsCalculatesExpectedResultDataProvider()
+    {
+        return [
+            'plain array' => [
+                [
+                    'first' => 1,
+                    'second' => 2
+                ],
+                [
+                    'first' => 1,
+                    'second' => 2
+                ]
+            ],
+            'plain array with dots' => [
+                [
+                    'first.' => 1,
+                    'second.' => 2
+                ],
+                [
+                    'first.' => 1,
+                    'second.' => 2
+                ]
+            ],
+            'nested array of 2 levels' => [
+                [
+                    'first.' => [
+                        'firstSub' => 1
+                    ],
+                    'second.' => [
+                        'secondSub' => 2
+                    ]
+                ],
+                [
+                    'first.firstSub' => 1,
+                    'second.secondSub' => 2
+                ]
+            ],
+            'nested array of 2 levels with dots' => [
+                [
+                    'first.' => [
+                        'firstSub.' => 1
+                    ],
+                    'second.' => [
+                        'secondSub.' => 2
+                    ]
+                ],
+                [
+                    'first.firstSub.' => 1,
+                    'second.secondSub.' => 2
+                ]
+            ],
+            'nested array of 3 levels' => [
+                [
+                    'first.' => [
+                        'firstSub.' => [
+                            'firstSubSub' => 1
+                        ]
+                    ],
+                    'second.' => [
+                        'secondSub.' => [
+                            'secondSubSub' => 2
+                        ]
+                    ]
+                ],
+                [
+                    'first.firstSub.firstSubSub' => 1,
+                    'second.secondSub.secondSubSub' => 2
+                ]
+            ],
+            'nested array of 3 levels with dots' => [
+                [
+                    'first.' => [
+                        'firstSub.' => [
+                            'firstSubSub.' => 1
+                        ]
+                    ],
+                    'second.' => [
+                        'secondSub.' => [
+                            'secondSubSub.' => 2
+                        ]
+                    ]
+                ],
+                [
+                    'first.firstSub.firstSubSub.' => 1,
+                    'second.secondSub.secondSubSub.' => 2
+                ]
+            ],
+            'nested array of 3 levels with multi dots' => [
+                [
+                    'first.' => [
+                        'firstSub..' => [
+                            'firstSubSub..' => 1
+                        ]
+                    ],
+                    'second.' => [
+                        'secondSub..' => [
+                            'secondSubSub.' => 2
+                        ]
+                    ]
+                ],
+                [
+                    'first.firstSub..firstSubSub..' => 1,
+                    'second.secondSub..secondSubSub.' => 2
+                ]
+            ]
+        ];
+    }
+
+    /**
+     * @test
+     * @param array $array
+     * @param array $expected
+     * @dataProvider flattenWithKeepDotsCalculatesExpectedResultDataProvider
+     */
+    public function flattenWithKeepDotsCalculatesExpectedResult(array $array, array $expected): void
+    {
+        $this->assertEquals($expected, ArrayUtility::flatten($array, '', true));
+    }
+
     ///////////////////////
     // Tests concerning intersectRecursive
     ///////////////////////
@@ -2989,6 +3111,140 @@ class ArrayUtilityTest extends UnitTestCase
     public function filterRecursiveSupportsCallableCallback(array $input, array $expectedResult, callable $callback)
     {
         $result = ArrayUtility::filterRecursive($input, $callback);
+        $this->assertEquals($expectedResult, $result);
+    }
+
+    /**
+     * Data provider for isAssociativeCorrectlyFindsStringKeys
+     * @return array
+     */
+    public function isAssociativeCorrectlyFindsStringKeysDataProvider()
+    {
+        return [
+            'array without string keys' => [
+                [
+                    0 => 'value 0',
+                    1 => 'value 1'
+                ],
+                false
+            ],
+            'array with only string keys' => [
+                [
+                    'key 0' => 'value 0',
+                    'key 1' => 'value 1'
+                ],
+                true
+            ],
+            'array with mixed keys' => [
+                [
+                    0 => 'value 0',
+                    1 => 'value 1',
+                    'key 2' => 'value 2',
+                    'key 3' => 'value 3'
+                ],
+                true
+            ],
+        ];
+    }
+
+    /**
+     * @test
+     * @dataProvider isAssociativeCorrectlyFindsStringKeysDataProvider
+     * @param array $array
+     * @param bool  $expectedResult
+     */
+    public function isAssociativeCorrectlyFindsStringKeys(array $array, bool $expectedResult)
+    {
+        $result = ArrayUtility::isAssociative($array);
+        $this->assertEquals($expectedResult, $result);
+    }
+
+    /**
+     * Data provider for replaceAndAppendScalarValuesRecursiveCorrectlyMergesArrays
+     * @return array
+     */
+    public function replaceAndAppendScalarValuesRecursiveCorrectlyMergesArraysDataProvider()
+    {
+        return [
+            'merge simple lists' => [
+                [
+                    0 => 'keep'
+                ],
+                [
+                    0 => 'keep'
+                ],
+                [
+                    0 => 'keep',
+                    1 => 'keep'
+                ]
+            ],
+            'merge simple list arrays' => [
+                [
+                    'foo' => [
+                        0 => 'keep'
+                    ]
+                ],
+                [
+                    'foo' => [
+                        0 => 'keep'
+                    ]
+                ],
+                [
+                    'foo' => [
+                        0 => 'keep',
+                        1 => 'keep'
+                    ]
+                ]
+            ],
+            'merge array and simple value' => [
+                [
+                    'foo' => [
+                        0 => 'override'
+                    ]
+                ],
+                [
+                    'foo' => 'keep'
+                ],
+                [
+                    'foo' => 'keep'
+                ]
+            ],
+            'merge simple values' => [
+                [
+                    'foo' => 'override'
+                ],
+                [
+                    'foo' => 'keep'
+                ],
+                [
+                    'foo' => 'keep'
+                ]
+            ],
+            'merge new keys' => [
+                [
+                    'foo' => 'keep'
+                ],
+                [
+                    'bar' => 'keep'
+                ],
+                [
+                    'foo' => 'keep',
+                    'bar' => 'keep'
+                ]
+            ],
+        ];
+    }
+
+    /**
+     * @test
+     * @dataProvider replaceAndAppendScalarValuesRecursiveCorrectlyMergesArraysDataProvider
+     * @param array $array1
+     * @param array $array2
+     * @param array $expectedResult
+     */
+    public function replaceAndAppendScalarValuesRecursiveCorrectlyMergesArrays(array $array1, array $array2, array $expectedResult)
+    {
+        $result = ArrayUtility::replaceAndAppendScalarValuesRecursive($array1, $array2);
         $this->assertEquals($expectedResult, $result);
     }
 }

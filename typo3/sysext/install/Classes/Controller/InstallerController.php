@@ -23,7 +23,6 @@ use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Configuration\ConfigurationManager;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Configuration\SiteConfiguration;
-use TYPO3\CMS\Core\Core\Bootstrap;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Crypto\PasswordHashing\Argon2iPasswordHash;
 use TYPO3\CMS\Core\Crypto\PasswordHashing\BcryptPasswordHash;
@@ -636,6 +635,7 @@ class InstallerController
         $username = (string)$postValues['username'] !== '' ? $postValues['username'] : 'admin';
         // Check password and return early if not good enough
         $password = $postValues['password'];
+        $email = $postValues['email'] ?? '';
         if (empty($password) || strlen($password) < 8) {
             $messages[] = new FlashMessage(
                 'You are setting an important password here! It gives an attacker full control over your instance if cracked.'
@@ -675,6 +675,7 @@ class InstallerController
         $adminUserFields = [
             'username' => $username,
             'password' => $this->getHashedPassword($password),
+            'email' => GeneralUtility::validEmail($email) ? $email : '',
             'admin' => 1,
             'tstamp' => $GLOBALS['EXEC_TIME'],
             'crdate' => $GLOBALS['EXEC_TIME']
@@ -1234,26 +1235,6 @@ For each website you need a TypoScript template on the main page of your website
             SiteConfiguration::class,
             Environment::getConfigPath() . '/sites'
         );
-        $siteConfiguration->write($identifier, [
-            'rootPageId' => $rootPageId,
-            'base' => $normalizedParams->getSiteUrl(),
-            'languages' => [
-                0 => [
-                    'title' => 'English',
-                    'enabled' => true,
-                    'languageId' => 0,
-                    'base' => '/en/',
-                    'typo3Language' => 'default',
-                    'locale' => 'en_US.UTF-8',
-                    'iso-639-1' => 'en',
-                    'navigationTitle' => 'English',
-                    'hreflang' => 'en-us',
-                    'direction' => 'ltr',
-                    'flag' => 'us',
-                ],
-            ],
-            'errorHandling' => [],
-            'routes' => [],
-        ]);
+        $siteConfiguration->createNewBasicSite($identifier, $rootPageId, $normalizedParams->getSiteUrl());
     }
 }

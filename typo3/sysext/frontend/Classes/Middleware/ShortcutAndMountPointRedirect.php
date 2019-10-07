@@ -19,16 +19,16 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Http\RedirectResponse;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * Checks mount points, shortcuts and redirects to the target.
  * Alternatively, checks if the current page is an redirect to an external page
  *
- * @internal this middleware might get removed in TYPO3 v10.0.
+ * @internal this middleware might get removed in TYPO3 v10.x.
  */
 class ShortcutAndMountPointRedirect implements MiddlewareInterface
 {
@@ -37,9 +37,9 @@ class ShortcutAndMountPointRedirect implements MiddlewareInterface
      */
     private $controller;
 
-    public function __construct(TypoScriptFrontendController $controller = null)
+    public function __construct(TypoScriptFrontendController $controller)
     {
-        $this->controller = $controller ?: $GLOBALS['TSFE'];
+        $this->controller = $controller;
     }
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface

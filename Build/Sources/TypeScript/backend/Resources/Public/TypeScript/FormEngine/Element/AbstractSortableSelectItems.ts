@@ -35,7 +35,7 @@ export abstract class AbstractSortableSelectItems {
    * @param {HTMLSelectElement} fieldElement
    */
   private static moveOptionToBottom(fieldElement: HTMLSelectElement): void {
-    Array.from(fieldElement.querySelectorAll(':checked')).forEach((optionEl: HTMLOptionElement): void => {
+    fieldElement.querySelectorAll(':checked').forEach((optionEl: HTMLOptionElement): void => {
       fieldElement.insertBefore(optionEl, null);
     });
   }
@@ -83,7 +83,7 @@ export abstract class AbstractSortableSelectItems {
    * @param {HTMLSelectElement} availableFieldElement
    */
   private static removeOption(fieldElement: HTMLSelectElement, availableFieldElement: HTMLSelectElement): void {
-    Array.from(fieldElement.querySelectorAll(':checked')).forEach((option: HTMLOptionElement): void => {
+    fieldElement.querySelectorAll(':checked').forEach((option: HTMLOptionElement): void => {
       const originalOption = <HTMLOptionElement>availableFieldElement.querySelector('option[value="' + option.value + '"]');
       if (originalOption !== null) {
         originalOption.classList.remove('hidden');
@@ -103,10 +103,10 @@ export abstract class AbstractSortableSelectItems {
       return;
     }
 
-    aside.addEventListener('click', (e): void => {
+    aside.addEventListener('click', (e: Event): void => {
       let target: HTMLAnchorElement;
 
-      if ((target = <HTMLAnchorElement>(<Element>e.target).closest('.t3js-btn-option')) === null) {
+      if ((target = (<Element>e.target).closest('.t3js-btn-option')) === null) {
         if ((<Element>e.target).matches('.t3js-btn-option')) {
           target = <HTMLAnchorElement>e.target;
         }

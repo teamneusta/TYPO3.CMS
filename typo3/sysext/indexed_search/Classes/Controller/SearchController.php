@@ -19,6 +19,7 @@ use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\FrontendRestrictionContainer;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Exception\Page\RootLineException;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Html\HtmlParser;
@@ -32,7 +33,6 @@ use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Core\Utility\RootlineUtility;
 use TYPO3\CMS\Extbase\Annotation as Extbase;
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * Index search frontend
@@ -292,7 +292,7 @@ class SearchController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionControlle
                         ->getQueryBuilderForTable('index_config');
                     $queryBuilder->setRestrictions(GeneralUtility::makeInstance(FrontendRestrictionContainer::class));
                     $indexCfgRec = $queryBuilder
-                        ->select('*')
+                        ->select('title')
                         ->from('index_config')
                         ->where(
                             $queryBuilder->expr()->eq(
@@ -302,7 +302,8 @@ class SearchController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionControlle
                         )
                         ->execute()
                         ->fetch();
-                    $categoryTitle = $indexCfgRec['title'];
+                    $categoryTitle = LocalizationUtility::translate('indexingConfigurationHeader.' . $freeIndexUid, 'IndexedSearch');
+                    $categoryTitle = $categoryTitle ?: $indexCfgRec['title'];
                 } else {
                     $categoryTitle = LocalizationUtility::translate('indexingConfigurationHeader.' . $freeIndexUid, 'IndexedSearch');
                 }
@@ -462,7 +463,7 @@ class SearchController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionControlle
         $resultData['headerOnly'] = $headerOnly;
         $resultData['CSSsuffix'] = $specRowConf['CSSsuffix'] ? '-' . $specRowConf['CSSsuffix'] : '';
         if ($this->multiplePagesType($row['item_type'])) {
-            $dat = unserialize($row['cHashParams']);
+            $dat = json_decode($row['static_page_arguments'], true);
             $pp = explode('-', $dat['key']);
             if ($pp[0] != $pp[1]) {
                 $resultData['titleaddition'] = ', ' . LocalizationUtility::translate('result.page', 'IndexedSearch') . ' ' . $dat['key'];
@@ -484,7 +485,7 @@ class SearchController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionControlle
             } else {
                 // Suspicious, so linking to page instead...
                 $copiedRow = $row;
-                unset($copiedRow['cHashParams']);
+                unset($copiedRow['static_page_arguments']);
                 $title = $this->linkPageATagWrap(
                     htmlspecialchars($title),
                     $this->linkPage($row['page_id'], $copiedRow)
@@ -535,7 +536,6 @@ class SearchController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionControlle
             $pathLinkData = $this->linkPage(
                 $pathId,
                 [
-                    'cHashParams' => $row['cHashParams'],
                     'data_page_type' => $row['data_page_type'],
                     'data_page_mp' => $pathMP,
                     'sys_language_uid' => $row['sys_language_uid'],
@@ -1207,7 +1207,9 @@ class SearchController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionControlle
                     ->execute();
 
                 while ($row = $result->fetch()) {
-                    $allOptions[$row['uid']] = $row['title'];
+                    $indexId = (int)$row['uid'];
+                    $title = LocalizationUtility::translate('indexingConfigurations.' . $indexId, 'IndexedSearch');
+                    $allOptions[$indexId] = $title ?: $row['title'];
                 }
             }
             // disable single entries by TypoScript
@@ -1329,9 +1331,9 @@ class SearchController extends \TYPO3\CMS\Extbase\Mvc\Controller\ActionControlle
     {
         $pageLanguage = GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('language', 'contentId', 0);
         // Parameters for link
-        $urlParameters = (array)unserialize($row['cHashParams']);
+        $urlParameters = [];
         if ($row['static_page_arguments'] !== null) {
-            $urlParameters = array_replace_recursive($urlParameters, json_decode($row['static_page_arguments'], true));
+            $urlParameters = json_decode($row['static_page_arguments'], true);
         }
         // Add &type and &MP variable:
         if ($row['data_page_mp']) {

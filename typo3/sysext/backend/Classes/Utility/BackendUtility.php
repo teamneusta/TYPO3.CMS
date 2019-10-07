@@ -29,6 +29,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\BackendWorkspaceRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
 use TYPO3\CMS\Core\Database\RelationHandler;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Http\Uri;
 use TYPO3\CMS\Core\Imaging\Icon;
@@ -51,7 +52,6 @@ use TYPO3\CMS\Core\Utility\HttpUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Core\Versioning\VersionState;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * Standard functions available for the TYPO3 backend.
@@ -523,7 +523,7 @@ class BackendUtility
         if ($clause !== '' && strpos($clause, 'AND') !== 0) {
             $clause = 'AND ' . $clause;
         }
-        $data = self::BEgetRootLine($uid, $clause);
+        $data = self::BEgetRootLine($uid, $clause, true);
         foreach ($data as $record) {
             if ($record['uid'] === 0) {
                 continue;
@@ -2009,7 +2009,7 @@ class BackendUtility
                 }
         }
         // If this field is a password field, then hide the password by changing it to a random number of asterisk (*)
-        if (!empty($theColConf['eval']) && stristr($theColConf['eval'], 'password')) {
+        if (!empty($theColConf['eval']) && stripos($theColConf['eval'], 'password') !== false) {
             $l = '';
             $randomNumber = rand(5, 12);
             for ($i = 0; $i < $randomNumber; $i++) {
@@ -2274,9 +2274,11 @@ class BackendUtility
      * @param string $requestUri An optional returnUrl you can set - automatically set to REQUEST_URI.
      *
      * @return string
+     * @deprecated will be removed in TYPO3 v11.
      */
     public static function editOnClick($params, $_ = '', $requestUri = '')
     {
+        trigger_error(__METHOD__ . ' has been marked as deprecated and will be removed in TYPO3 v11. Consider using regular links and use the UriBuilder API instead.', E_USER_DEPRECATED);
         if ($requestUri == -1) {
             $returnUrl = 'T3_THIS_LOCATION';
         } else {
@@ -2482,6 +2484,7 @@ class BackendUtility
         $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
         $url = (string)$uriBuilder->buildUriFromRoute('tce_db') . $parameters . '&redirect=';
         if ((int)$redirectUrl === -1) {
+            trigger_error('Generating URLs to DataHandler for JavaScript click handlers is deprecated. Consider using the href attribute instead.', E_USER_DEPRECATED);
             $url = GeneralUtility::quoteJSvalue($url) . '+T3_THIS_LOCATION';
         } else {
             $url .= rawurlencode($redirectUrl ?: GeneralUtility::getIndpEnv('REQUEST_URI'));
@@ -2527,7 +2530,6 @@ class BackendUtility
 
     /**
      * Returns a selector box "function menu" for a module
-     * Requires the JS function jumpToUrl() to be available
      * See Inside TYPO3 for details about how to use / make Function menus
      *
      * @param mixed $mainParams The "&id=" parameter value to be sent to the module, but it can be also a parameter array which will be passed instead of the &id=...
@@ -2561,7 +2563,7 @@ class BackendUtility
         $dataMenuIdentifier = GeneralUtility::camelCaseToLowerCaseUnderscored($dataMenuIdentifier);
         $dataMenuIdentifier = str_replace('_', '-', $dataMenuIdentifier);
         if (!empty($options)) {
-            $onChange = 'jumpToUrl(' . GeneralUtility::quoteJSvalue($scriptUrl . '&' . $elementName . '=') . '+this.options[this.selectedIndex].value,this);';
+            $onChange = 'window.location.href = ' . GeneralUtility::quoteJSvalue($scriptUrl . '&' . $elementName . '=') . '+this.options[this.selectedIndex].value;';
             return '
 
 				<!-- Function Menu of module -->
@@ -2576,7 +2578,6 @@ class BackendUtility
 
     /**
      * Returns a selector box to switch the view
-     * Requires the JS function jumpToUrl() to be available
      * Based on BackendUtility::getFuncMenu() but done as new function because it has another purpose.
      * Mingling with getFuncMenu would harm the docHeader Menu.
      *
@@ -2611,7 +2612,7 @@ class BackendUtility
         $dataMenuIdentifier = GeneralUtility::camelCaseToLowerCaseUnderscored($dataMenuIdentifier);
         $dataMenuIdentifier = str_replace('_', '-', $dataMenuIdentifier);
         if (!empty($options)) {
-            $onChange = 'jumpToUrl(' . GeneralUtility::quoteJSvalue($scriptUrl . '&' . $elementName . '=') . '+this.options[this.selectedIndex].value,this);';
+            $onChange = 'window.location.href = ' . GeneralUtility::quoteJSvalue($scriptUrl . '&' . $elementName . '=') . '+this.options[this.selectedIndex].value;';
             return '
 			<div class="form-group">
 				<!-- Function Menu of module -->
@@ -2646,7 +2647,7 @@ class BackendUtility
         $tagParams = ''
     ) {
         $scriptUrl = self::buildScriptUrl($mainParams, $addParams, $script);
-        $onClick = 'jumpToUrl(' . GeneralUtility::quoteJSvalue($scriptUrl . '&' . $elementName . '=') . '+(this.checked?1:0),this);';
+        $onClick = 'window.location.href = ' . GeneralUtility::quoteJSvalue($scriptUrl . '&' . $elementName . '=') . '+(this.checked?1:0);';
 
         return
             '<input' .
@@ -2682,7 +2683,7 @@ class BackendUtility
         $addParams = ''
     ) {
         $scriptUrl = self::buildScriptUrl($mainParams, $addParams, $script);
-        $onChange = 'jumpToUrl(' . GeneralUtility::quoteJSvalue($scriptUrl . '&' . $elementName . '=') . '+escape(this.value),this);';
+        $onChange = 'window.location.href = ' . GeneralUtility::quoteJSvalue($scriptUrl . '&' . $elementName . '=') . '+escape(this.value);';
         return '<input type="text" class="form-control" name="' . $elementName . '" value="' . htmlspecialchars($currentValue) . '" onchange="' . htmlspecialchars($onChange) . '" />';
     }
 
@@ -2815,6 +2816,7 @@ class BackendUtility
      * @param string $type If type is 'ses' then the data is stored as session-lasting data. This means that it'll be wiped out the next time the user logs in.
      * @param string $dontValidateList dontValidateList can be used to list variables that should not be checked if their value is found in the MOD_MENU array. Used for dynamically generated menus.
      * @param string $setDefaultList List of default values from $MOD_MENU to set in the output array (only if the values from MOD_MENU are not arrays)
+     * @throws \RuntimeException
      * @return array The array $settings, which holds a key for each MOD_MENU key and the values of each key will be within the range of values for each menuitem
      */
     public static function getModuleData(
@@ -2867,14 +2869,14 @@ class BackendUtility
                     }
                 }
             } else {
-                die('No menu!');
+                throw new \RuntimeException('No menu', 1568119229);
             }
             if ($changed) {
                 $beUser->pushModuleData($modName, $settings);
             }
             return $settings;
         }
-        die('Wrong module name: "' . $modName . '"');
+        throw new \RuntimeException('Wrong module name "' . $modName . '"', 1568119221);
     }
 
     /*******************************************
@@ -3058,7 +3060,8 @@ class BackendUtility
      * @param int $pid Record pid, could be negative then pointing to a record from same table whose pid to find and return
      * @return int
      * @internal
-     * @see \TYPO3\CMS\Core\DataHandling\DataHandler::copyRecord(), getTSCpid()
+     * @see \TYPO3\CMS\Core\DataHandling\DataHandler::copyRecord()
+     * @see \TYPO3\CMS\Backend\Utility\BackendUtility::getTSCpid()
      */
     public static function getTSconfig_pidValue($table, $uid, $pid)
     {
@@ -3127,7 +3130,8 @@ class BackendUtility
      * @return array Array of two ints; first is the REAL PID of a record and if its a new record negative values are resolved to the true PID,
      * second value is the PID value for TSconfig (uid if table is pages, otherwise the pid)
      * @internal
-     * @see \TYPO3\CMS\Core\DataHandling\DataHandler::setHistory(), \TYPO3\CMS\Core\DataHandling\DataHandler::process_datamap()
+     * @see \TYPO3\CMS\Core\DataHandling\DataHandler::setHistory()
+     * @see \TYPO3\CMS\Core\DataHandling\DataHandler::process_datamap()
      */
     public static function getTSCpid($table, $uid, $pid)
     {
@@ -3344,7 +3348,7 @@ class BackendUtility
     ) {
         $realPid = 0;
         $outputRows = [];
-        if ($GLOBALS['TCA'][$table] && static::isTableWorkspaceEnabled($table)) {
+        if (static::isTableWorkspaceEnabled($table)) {
             if (is_array($row) && !$includeDeletedRecords) {
                 $row['_CURRENT_VERSION'] = true;
                 $realPid = $row['pid'];
@@ -3369,7 +3373,6 @@ class BackendUtility
             $queryBuilder
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)),
                     $queryBuilder->expr()->neq('uid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)),
                     $queryBuilder->expr()->eq('t3ver_oid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT))
                 )
@@ -3434,8 +3437,11 @@ class BackendUtility
         if (!ExtensionManagementUtility::isLoaded('workspaces')) {
             return;
         }
+        if (!static::isTableWorkspaceEnabled($table)) {
+            return;
+        }
         // Check that the input record is an offline version from a table that supports versioning:
-        if (is_array($rr) && $rr['pid'] == -1 && static::isTableWorkspaceEnabled($table)) {
+        if (is_array($rr)) {
             // Check values for t3ver_oid and t3ver_wsid:
             if (isset($rr['t3ver_oid']) && isset($rr['t3ver_wsid'])) {
                 // If "t3ver_oid" is already a field, just set this:
@@ -3627,10 +3633,6 @@ class BackendUtility
                     ->from($table)
                     ->where(
                         $queryBuilder->expr()->eq(
-                            'pid',
-                            $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
-                        ),
-                        $queryBuilder->expr()->eq(
                             't3ver_oid',
                             $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)
                         ),
@@ -3680,7 +3682,7 @@ class BackendUtility
         $liveVersionId = null;
         if (self::isTableWorkspaceEnabled($table)) {
             $currentRecord = self::getRecord($table, $uid, 'pid,t3ver_oid');
-            if (is_array($currentRecord) && $currentRecord['pid'] == -1) {
+            if (is_array($currentRecord) && (int)$currentRecord['t3ver_oid'] > 0) {
                 $liveVersionId = $currentRecord['t3ver_oid'];
             }
         }
@@ -3718,8 +3720,8 @@ class BackendUtility
                 $workspaceId = static::getBackendUserAuthentication()->workspace;
             }
             $workspaceId = (int)$workspaceId;
-            $pidOperator = $workspaceId === 0 ? '!=' : '=';
-            $whereClause = ' AND ' . $table . '.t3ver_wsid=' . $workspaceId . ' AND ' . $table . '.pid' . $pidOperator . '-1';
+            $comparison = $workspaceId === 0 ? '=' : '>';
+            $whereClause = ' AND ' . $table . '.t3ver_wsid=' . $workspaceId . ' AND ' . $table . '.t3ver_oid' . $comparison . '0';
         }
         return $whereClause;
     }
@@ -3759,7 +3761,7 @@ class BackendUtility
         if ($workspace === null && static::getBackendUserAuthentication() instanceof BackendUserAuthentication) {
             $workspace = static::getBackendUserAuthentication()->workspace;
         }
-        if ((int)$workspace !== 0 && $GLOBALS['TCA'][$table] && static::isTableWorkspaceEnabled($table)) {
+        if ((int)$workspace !== 0 && static::isTableWorkspaceEnabled($table)) {
             // Select workspace version of record:
             $queryBuilder = static::getQueryBuilderForTable($table);
             $queryBuilder->getRestrictions()
@@ -3770,10 +3772,6 @@ class BackendUtility
                 ->select(...GeneralUtility::trimExplode(',', $fields, true))
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->neq(
-                        'pid',
-                        $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
-                    ),
                     $queryBuilder->expr()->eq(
                         't3ver_state',
                         $queryBuilder->createNamedParameter(
@@ -3825,29 +3823,29 @@ class BackendUtility
             $warrantyNote = sprintf(
                 $lang->sL('LLL:EXT:backend/Resources/Private/Language/locallang_login.xlf:warranty.by'),
                 htmlspecialchars($loginCopyrightWarrantyProvider),
-                '<a href="' . htmlspecialchars($loginCopyrightWarrantyURL) . '" target="_blank">',
+                '<a href="' . htmlspecialchars($loginCopyrightWarrantyURL) . '" target="_blank" rel="noopener noreferrer">',
                 '</a>'
             );
         } else {
             $warrantyNote = sprintf(
                 $lang->sL('LLL:EXT:backend/Resources/Private/Language/locallang_login.xlf:no.warranty'),
-                '<a href="' . TYPO3_URL_LICENSE . '" target="_blank">',
+                '<a href="' . TYPO3_URL_LICENSE . '" target="_blank" rel="noopener noreferrer">',
                 '</a>'
             );
         }
-        $cNotice = '<a href="' . TYPO3_URL_GENERAL . '" target="_blank">' .
+        $cNotice = '<a href="' . TYPO3_URL_GENERAL . '" target="_blank" rel="noopener noreferrer">' .
             $lang->sL('LLL:EXT:backend/Resources/Private/Language/locallang_login.xlf:typo3.cms') . '</a>. ' .
             $lang->sL('LLL:EXT:backend/Resources/Private/Language/locallang_login.xlf:copyright') . ' &copy; '
             . htmlspecialchars(TYPO3_copyright_year) . ' Kasper Sk&aring;rh&oslash;j. ' .
             $lang->sL('LLL:EXT:backend/Resources/Private/Language/locallang_login.xlf:extension.copyright') . ' ' .
             sprintf(
                 $lang->sL('LLL:EXT:backend/Resources/Private/Language/locallang_login.xlf:details.link'),
-                '<a href="' . TYPO3_URL_GENERAL . '" target="_blank">' . TYPO3_URL_GENERAL . '</a>'
+                '<a href="' . TYPO3_URL_GENERAL . '" target="_blank" rel="noopener noreferrer">' . TYPO3_URL_GENERAL . '</a>'
             ) . ' ' .
             strip_tags($warrantyNote, '<a>') . ' ' .
             sprintf(
                 $lang->sL('LLL:EXT:backend/Resources/Private/Language/locallang_login.xlf:free.software'),
-                '<a href="' . TYPO3_URL_LICENSE . '" target="_blank">',
+                '<a href="' . TYPO3_URL_LICENSE . '" target="_blank" rel="noopener noreferrer">',
                 '</a> '
             )
             . $lang->sL('LLL:EXT:backend/Resources/Private/Language/locallang_login.xlf:keep.notice');

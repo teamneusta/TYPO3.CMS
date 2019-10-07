@@ -10,4 +10,4 @@
  *
  * The TYPO3 project - inspiring people to share!
  */
-define(["require","exports","jquery","TYPO3/CMS/Backend/jquery.clearable"],function(e,r,n){"use strict";return new function(){var e=n("#tx_Beuser_username"),r=""!==e.first().val();e.clearable({onClear:function(e){r&&n(e.currentTarget).closest("form").submit()}})}});
+define(["require","exports","TYPO3/CMS/Backend/Input/Clearable"],function(e,r){"use strict";return new class{constructor(){let e;if(null!==(e=document.querySelector("#tx_Beuser_username"))){const r=""!==e.value;e.clearable({onClear:e=>{r&&e.closest("form").submit()}})}}}});

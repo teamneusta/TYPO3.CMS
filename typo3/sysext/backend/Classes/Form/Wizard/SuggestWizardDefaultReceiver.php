@@ -195,7 +195,7 @@ class SuggestWizardDefaultReceiver
                     'text' => '<span class="suggest-label">' . $label . '</span><span class="suggest-uid">[' . $uid . ']</span><br />
 								<span class="suggest-path">' . $croppedPath . '</span>',
                     'table' => $this->mmForeignTable ? $this->mmForeignTable : $this->table,
-                    'label' => $label,
+                    'label' => strip_tags($label),
                     'path' => $path,
                     'uid' => $uid,
                     'style' => '',
@@ -385,7 +385,7 @@ class SuggestWizardDefaultReceiver
     protected function makeWorkspaceOverlay(&$row)
     {
         // Check for workspace-versions
-        if ($GLOBALS['BE_USER']->workspace != 0 && $GLOBALS['TCA'][$this->table]['ctrl']['versioningWS'] == true) {
+        if ($GLOBALS['BE_USER']->workspace != 0 && BackendUtility::isTableWorkspaceEnabled($this->table)) {
             BackendUtility::workspaceOL($this->mmForeignTable ? $this->mmForeignTable : $this->table, $row);
         }
     }

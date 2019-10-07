@@ -20,6 +20,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Core\Bootstrap;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\ReferenceIndex;
@@ -242,6 +243,10 @@ If you want to get more detailed information, use the --verbose option.')
                 if (isset($GLOBALS['TCA'][$rec['ref_table']]['ctrl']['delete'])) {
                     $selectFields[] = $GLOBALS['TCA'][$rec['ref_table']]['ctrl']['delete'];
                 }
+                if (BackendUtility::isTableWorkspaceEnabled($rec['ref_table'])) {
+                    $selectFields[] = 't3ver_oid';
+                    $selectFields[] = 't3ver_wsid';
+                }
 
                 $existingRecords[$idx] = $queryBuilder
                     ->select(...$selectFields)
@@ -260,7 +265,7 @@ If you want to get more detailed information, use the --verbose option.')
             // Handle missing file:
             if ($existingRecords[$idx]['uid']) {
                 // Record exists, but is a reference to an offline version
-                if ((int)$existingRecords[$idx]['pid'] === -1) {
+                if ((int)($existingRecords[$idx]['t3ver_oid'] ?? 0) > 0) {
                     if ($isSoftReference) {
                         $offlineVersionRecordsInSoftReferenceRelations[] = $infoString;
                     } else {

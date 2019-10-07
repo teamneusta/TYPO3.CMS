@@ -196,6 +196,7 @@ class InlineRecordContainer extends AbstractContainer
                 'data-field-name' => $appendFormFieldNames,
                 'data-topmost-parent-table' => $data['inlineTopMostParentTableName'],
                 'data-topmost-parent-uid' => $data['inlineTopMostParentUid'],
+                'data-table-unique-original-value' => $data['inlineData']['unique'][$domObjectId . '-' . $foreignTable]['used'][$record['uid']] ?? '',
             ];
 
             $html = '
@@ -250,6 +251,13 @@ class InlineRecordContainer extends AbstractContainer
     {
         $childData = $data['combinationChild'];
         $parentConfig = $data['inlineParentConfig'];
+
+        // If field is set to readOnly, set all fields of the relation to readOnly as well
+        if (isset($parentConfig['readOnly']) && $parentConfig['readOnly']) {
+            foreach ($childData['processedTca']['columns'] as $columnName => $columnConfiguration) {
+                $childData['processedTca']['columns'][$columnName]['config']['readOnly'] = true;
+            }
+        }
 
         $resultArray = $this->initializeResultArray();
 
@@ -413,6 +421,7 @@ class InlineRecordContainer extends AbstractContainer
             'locked' => '',
         ];
         $isNewItem = strpos($rec['uid'], 'NEW') === 0;
+        $isParentReadOnly = isset($inlineConfig['readOnly']) && $inlineConfig['readOnly'];
         $isParentExisting = MathUtility::canBeInterpretedAsInteger($data['inlineParentUid']);
         $tcaTableCtrl = $GLOBALS['TCA'][$foreignTable]['ctrl'];
         $tcaTableCols = $GLOBALS['TCA'][$foreignTable]['columns'];
@@ -460,7 +469,7 @@ class InlineRecordContainer extends AbstractContainer
             }
         }
         // If the table is NOT a read-only table, then show these links:
-        if (!$tcaTableCtrl['readOnly'] && !$data['isInlineDefaultLanguageRecordInLocalizedParentContext']) {
+        if (!$isParentReadOnly && !$tcaTableCtrl['readOnly'] && !$data['isInlineDefaultLanguageRecordInLocalizedParentContext']) {
             // "New record after" link (ONLY if the records in the table are sorted by a "sortby"-row or if default values can depend on previous record):
             if ($enabledControls['new'] && ($enableManualSorting || $tcaTableCtrl['useColumnsForDefaultValues'])) {
                 if (!$isPagesTable && $calcPerms & Permission::CONTENT_EDIT || $isPagesTable && $calcPerms & Permission::PAGE_NEW) {

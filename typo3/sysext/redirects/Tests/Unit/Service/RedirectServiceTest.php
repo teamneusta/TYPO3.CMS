@@ -24,6 +24,8 @@ use TYPO3\CMS\Core\Resource\Exception\InvalidPathException;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\SiteFinder;
+use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 use TYPO3\CMS\Redirects\Service\RedirectCacheService;
 use TYPO3\CMS\Redirects\Service\RedirectService;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
@@ -50,14 +52,20 @@ class RedirectServiceTest extends UnitTestCase
      */
     protected $redirectService;
 
+    /**
+     * @var SiteFinder
+     */
+    protected $siteFinder;
+
     protected function setUp(): void
     {
         parent::setUp();
         $loggerProphecy = $this->prophesize(LoggerInterface::class);
         $this->redirectCacheServiceProphecy = $this->prophesize(RedirectCacheService::class);
         $this->linkServiceProphecy = $this->prophesize(LinkService::class);
+        $this->siteFinder = $this->prophesize(SiteFinder::class);
 
-        $this->redirectService = new RedirectService($this->redirectCacheServiceProphecy->reveal(), $this->linkServiceProphecy->reveal());
+        $this->redirectService = new RedirectService($this->redirectCacheServiceProphecy->reveal(), $this->linkServiceProphecy->reveal(), $this->siteFinder->reveal());
         $this->redirectService->setLogger($loggerProphecy->reveal());
 
         $GLOBALS['SIM_ACCESS_TIME'] = 42;
@@ -408,7 +416,7 @@ class RedirectServiceTest extends UnitTestCase
     {
         $this->linkServiceProphecy->resolve(Argument::any())->willThrow(new InvalidPathException('', 1516531195));
 
-        $result = $this->redirectService->getTargetUrl(['target' => 'invalid'], [], new Site('dummy', 13, []));
+        $result = $this->redirectService->getTargetUrl(['target' => 'invalid'], [], new FrontendUserAuthentication(), new Site('dummy', 13, []));
 
         self::assertNull($result);
     }
@@ -429,7 +437,7 @@ class RedirectServiceTest extends UnitTestCase
         ];
         $this->linkServiceProphecy->resolve($redirectTargetMatch['target'])->willReturn($linkDetails);
 
-        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, [], new Site('dummy', 13, []));
+        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, [], new FrontendUserAuthentication(), new Site('dummy', 13, []));
 
         $uri = new Uri('https://example.com/');
         self::assertEquals($uri, $result);
@@ -453,7 +461,7 @@ class RedirectServiceTest extends UnitTestCase
         ];
         $this->linkServiceProphecy->resolve($redirectTargetMatch['target'])->willReturn($linkDetails);
 
-        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, [], new Site('dummy', 13, []));
+        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, [], new FrontendUserAuthentication(), new Site('dummy', 13, []));
 
         $uri = new Uri('https://example.com/file.txt');
         self::assertEquals($uri, $result);
@@ -478,7 +486,7 @@ class RedirectServiceTest extends UnitTestCase
         ];
         $this->linkServiceProphecy->resolve($redirectTargetMatch['target'])->willReturn($linkDetails);
 
-        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, [], new Site('dummy', 13, []));
+        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, [], new FrontendUserAuthentication(), new Site('dummy', 13, []));
 
         $uri = new Uri('https://example.com/folder/');
         self::assertEquals($uri, $result);
@@ -500,7 +508,7 @@ class RedirectServiceTest extends UnitTestCase
         ];
         $this->linkServiceProphecy->resolve($redirectTargetMatch['target'])->willReturn($linkDetails);
 
-        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, [], new Site('dummy', 13, []));
+        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, [], new FrontendUserAuthentication(), new Site('dummy', 13, []));
 
         $uri = new Uri('https://example.com');
         self::assertEquals($uri, $result);
@@ -522,7 +530,7 @@ class RedirectServiceTest extends UnitTestCase
         ];
         $this->linkServiceProphecy->resolve($redirectTargetMatch['target'])->willReturn($linkDetails);
 
-        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, ['bar' => 3, 'baz' => 4], new Site('dummy', 13, []));
+        $result = $this->redirectService->getTargetUrl($redirectTargetMatch, ['bar' => 3, 'baz' => 4], new FrontendUserAuthentication(), new Site('dummy', 13, []));
 
         $uri = new Uri('https://example.com/?bar=2&baz=4&foo=1');
         self::assertEquals($uri, $result);

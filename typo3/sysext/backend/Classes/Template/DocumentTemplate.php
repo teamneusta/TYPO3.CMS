@@ -71,6 +71,7 @@ class DocumentTemplate implements LoggerAwareInterface
      */
     public $JScodeArray = ['jumpToUrl' => '
 function jumpToUrl(URL) {
+	console.warn(\'jumpToUrl() has been marked as deprecated.\');
 	window.location.href = URL;
 	return false;
 }
@@ -351,7 +352,6 @@ function jumpToUrl(URL) {
      *
      * @param string $thisLocation URL to "this location" / current script
      * @return string Urls are returned as JavaScript variables T3_RETURN_URL and T3_THIS_LOCATION
-     * @see typo3/db_list.php
      */
     public function redirectUrls($thisLocation = '')
     {
@@ -362,7 +362,9 @@ function jumpToUrl(URL) {
             'popViewId' => ''
         ]);
         $out = '
+	// @deprecated
 	var T3_RETURN_URL = ' . GeneralUtility::quoteJSvalue(str_replace('%20', '', rawurlencode(GeneralUtility::sanitizeLocalUrl(GeneralUtility::_GP('returnUrl'))))) . ';
+	// @deprecated
 	var T3_THIS_LOCATION = ' . GeneralUtility::quoteJSvalue(str_replace('%20', '', rawurlencode($thisLocation))) . '
 		';
         return $out;
@@ -417,7 +419,6 @@ function jumpToUrl(URL) {
 
         $headerStart = '<!DOCTYPE html>';
         $this->pageRenderer->setXmlPrologAndDocType($headerStart);
-        header('Content-Type:text/html;charset=utf-8');
         $this->pageRenderer->setCharSet('utf-8');
         $this->pageRenderer->setMetaTag('name', 'generator', $this->generator());
         $this->pageRenderer->setMetaTag('name', 'robots', 'noindex,follow');
@@ -560,9 +561,8 @@ function jumpToUrl(URL) {
     {
         $path = GeneralUtility::getFileAbsFileName($path);
         // Read all files in directory and sort them alphabetically
-        $cssFiles = GeneralUtility::getFilesInDir($path, 'css');
-        foreach ($cssFiles as $cssFile) {
-            $this->pageRenderer->addCssFile(PathUtility::getRelativePathTo($path) . $cssFile);
+        foreach (GeneralUtility::getFilesInDir($path, 'css', true) as $cssFile) {
+            $this->pageRenderer->addCssFile($cssFile);
         }
     }
 

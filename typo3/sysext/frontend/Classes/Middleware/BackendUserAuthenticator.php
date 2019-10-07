@@ -36,15 +36,21 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * a different middleware later-on might unset the BE_USER as he/she is not allowed to preview a certain
  * page due to rights management. As this can only happen once the page ID is resolved, this will happen
  * after the routing middleware.
- *
- * Currently, this middleware depends on the availability of $GLOBALS['TSFE'], however, this is solely
- * due to backwards-compatibility and will be disabled in the future.
  */
 class BackendUserAuthenticator implements MiddlewareInterface
 {
     /**
-     * Creates a frontend user authentication object, tries to authenticate a user
-     * and stores the object in $GLOBALS['TSFE']->fe_user.
+     * @var Context
+     */
+    protected $context;
+
+    public function __construct(Context $context)
+    {
+        $this->context = $context;
+    }
+
+    /**
+     * Creates a backend user authentication object, tries to authenticate a user
      *
      * @param ServerRequestInterface $request
      * @param RequestHandlerInterface $handler
@@ -67,7 +73,7 @@ class BackendUserAuthenticator implements MiddlewareInterface
             Bootstrap::initializeLanguageObject();
             Bootstrap::initializeBackendRouter();
             Bootstrap::loadExtTables();
-            $this->setBackendUserAspect(GeneralUtility::makeInstance(Context::class), $GLOBALS['BE_USER']);
+            $this->setBackendUserAspect($GLOBALS['BE_USER']);
         }
 
         return $handler->handle($request);
@@ -120,12 +126,11 @@ class BackendUserAuthenticator implements MiddlewareInterface
     /**
      * Register the backend user as aspect
      *
-     * @param Context $context
      * @param BackendUserAuthentication|null $user
      */
-    protected function setBackendUserAspect(Context $context, BackendUserAuthentication $user)
+    protected function setBackendUserAspect(BackendUserAuthentication $user)
     {
-        $context->setAspect('backend.user', GeneralUtility::makeInstance(UserAspect::class, $user));
-        $context->setAspect('workspace', GeneralUtility::makeInstance(WorkspaceAspect::class, $user->workspace));
+        $this->context->setAspect('backend.user', GeneralUtility::makeInstance(UserAspect::class, $user));
+        $this->context->setAspect('workspace', GeneralUtility::makeInstance(WorkspaceAspect::class, $user->workspace));
     }
 }

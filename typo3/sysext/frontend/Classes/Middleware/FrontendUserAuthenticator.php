@@ -27,13 +27,22 @@ use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 
 /**
  * This middleware authenticates a Frontend User (fe_users).
- * A valid $GLOBALS['TSFE'] object is needed for the time being, being fully backwards-compatible.
  */
 class FrontendUserAuthenticator implements MiddlewareInterface
 {
     /**
-     * Creates a frontend user authentication object, tries to authenticate a user
-     * and stores the object in $GLOBALS['TSFE']->fe_user.
+     * @var Context
+     */
+    protected $context;
+
+    public function __construct(Context $context)
+    {
+        $this->context = $context;
+    }
+
+    /**
+     * Creates a frontend user authentication object, tries to authenticate a user and stores
+     * it in the current request as attribute.
      *
      * @param ServerRequestInterface $request
      * @param RequestHandlerInterface $handler
@@ -59,11 +68,9 @@ class FrontendUserAuthenticator implements MiddlewareInterface
         $frontendUser->start();
         $frontendUser->unpack_uc();
 
-        // Keep the backwards-compatibility for TYPO3 v9, to have the fe_user within the global TSFE object
-        $GLOBALS['TSFE']->fe_user = $frontendUser;
-
-        // Register the frontend user as aspect
-        $this->setFrontendUserAspect(GeneralUtility::makeInstance(Context::class), $frontendUser);
+        // Register the frontend user as aspect and within the session
+        $this->setFrontendUserAspect($frontendUser);
+        $request = $request->withAttribute('frontend.user', $frontendUser);
 
         $response = $handler->handle($request);
 
@@ -115,11 +122,10 @@ class FrontendUserAuthenticator implements MiddlewareInterface
     /**
      * Register the frontend user as aspect
      *
-     * @param Context $context
      * @param AbstractUserAuthentication $user
      */
-    protected function setFrontendUserAspect(Context $context, AbstractUserAuthentication $user)
+    protected function setFrontendUserAspect(AbstractUserAuthentication $user)
     {
-        $context->setAspect('frontend.user', GeneralUtility::makeInstance(UserAspect::class, $user));
+        $this->context->setAspect('frontend.user', GeneralUtility::makeInstance(UserAspect::class, $user));
     }
 }

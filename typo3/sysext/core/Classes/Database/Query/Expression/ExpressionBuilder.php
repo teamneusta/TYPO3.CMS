@@ -62,7 +62,7 @@ class ExpressionBuilder
     /**
      * Creates a conjunction of the given boolean expressions
      *
-     * @param mixed,... $expressions Optional clause. Requires at least one defined when converting to string.
+     * @param mixed $expressions Optional clause. Requires at least one defined when converting to string.
      *
      * @return CompositeExpression
      */
@@ -74,7 +74,7 @@ class ExpressionBuilder
     /**
      * Creates a disjunction of the given boolean expressions.
      *
-     * @param mixed,... $expressions Optional clause. Requires at least one defined when converting to string.
+     * @param mixed $expressions Optional clause. Requires at least one defined when converting to string.
      *
      * @return CompositeExpression
      */
@@ -368,7 +368,7 @@ class ExpressionBuilder
                         )
                         : $this->literal(
                             ',' . $this->unquoteLiteral($value) . ','
-                    )
+                        )
                 );
                 return $comparison;
             default:

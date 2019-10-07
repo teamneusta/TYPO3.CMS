@@ -17,6 +17,7 @@ namespace TYPO3\CMS\Core\DataHandling\History;
 
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\DataHandling\Model\CorrelationId;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -81,9 +82,10 @@ class RecordHistoryStore
      * @param string $table
      * @param int $uid
      * @param array $payload
+     * @param string|null $correlationId
      * @return string
      */
-    public function addRecord(string $table, int $uid, array $payload): string
+    public function addRecord(string $table, int $uid, array $payload, CorrelationId $correlationId = null): string
     {
         $data = [
             'actiontype' => self::ACTION_ADD,
@@ -95,6 +97,7 @@ class RecordHistoryStore
             'tstamp' => $this->tstamp,
             'history_data' => json_encode($payload),
             'workspace' => $this->workspaceId,
+            'correlation_id' => (string)$this->createCorrelationId($table, $uid, $correlationId),
         ];
         $this->getDatabaseConnection()->insert('sys_history', $data);
         return $this->getDatabaseConnection()->lastInsertId('sys_history');
@@ -104,9 +107,10 @@ class RecordHistoryStore
      * @param string $table
      * @param int $uid
      * @param array $payload
+     * @param string|null $correlationId
      * @return string
      */
-    public function modifyRecord(string $table, int $uid, array $payload): string
+    public function modifyRecord(string $table, int $uid, array $payload, CorrelationId $correlationId = null): string
     {
         $data = [
             'actiontype' => self::ACTION_MODIFY,
@@ -118,6 +122,7 @@ class RecordHistoryStore
             'tstamp' => $this->tstamp,
             'history_data' => json_encode($payload),
             'workspace' => $this->workspaceId,
+            'correlation_id' => (string)$this->createCorrelationId($table, $uid, $correlationId),
         ];
         $this->getDatabaseConnection()->insert('sys_history', $data);
         return $this->getDatabaseConnection()->lastInsertId('sys_history');
@@ -126,9 +131,10 @@ class RecordHistoryStore
     /**
      * @param string $table
      * @param int $uid
+     * @param string|null $correlationId
      * @return string
      */
-    public function deleteRecord(string $table, int $uid): string
+    public function deleteRecord(string $table, int $uid, CorrelationId $correlationId = null): string
     {
         $data = [
             'actiontype' => self::ACTION_DELETE,
@@ -139,6 +145,7 @@ class RecordHistoryStore
             'recuid' => $uid,
             'tstamp' => $this->tstamp,
             'workspace' => $this->workspaceId,
+            'correlation_id' => (string)$this->createCorrelationId($table, $uid, $correlationId),
         ];
         $this->getDatabaseConnection()->insert('sys_history', $data);
         return $this->getDatabaseConnection()->lastInsertId('sys_history');
@@ -147,9 +154,10 @@ class RecordHistoryStore
     /**
      * @param string $table
      * @param int $uid
+     * @param string|null $correlationId
      * @return string
      */
-    public function undeleteRecord(string $table, int $uid): string
+    public function undeleteRecord(string $table, int $uid, CorrelationId $correlationId = null): string
     {
         $data = [
             'actiontype' => self::ACTION_UNDELETE,
@@ -160,6 +168,7 @@ class RecordHistoryStore
             'recuid' => $uid,
             'tstamp' => $this->tstamp,
             'workspace' => $this->workspaceId,
+            'correlation_id' => (string)$this->createCorrelationId($table, $uid, $correlationId),
         ];
         $this->getDatabaseConnection()->insert('sys_history', $data);
         return $this->getDatabaseConnection()->lastInsertId('sys_history');
@@ -169,9 +178,10 @@ class RecordHistoryStore
      * @param string $table
      * @param int $uid
      * @param array $payload
+     * @param string|null $correlationId
      * @return string
      */
-    public function moveRecord(string $table, int $uid, array $payload): string
+    public function moveRecord(string $table, int $uid, array $payload, CorrelationId $correlationId = null): string
     {
         $data = [
             'actiontype' => self::ACTION_MOVE,
@@ -183,9 +193,19 @@ class RecordHistoryStore
             'tstamp' => $this->tstamp,
             'history_data' => json_encode($payload),
             'workspace' => $this->workspaceId,
+            'correlation_id' => (string)$this->createCorrelationId($table, $uid, $correlationId),
         ];
         $this->getDatabaseConnection()->insert('sys_history', $data);
         return $this->getDatabaseConnection()->lastInsertId('sys_history');
+    }
+
+    protected function createCorrelationId(string $tableName, int $uid, ?CorrelationId $correlationId): CorrelationId
+    {
+        if ($correlationId !== null && $correlationId->getSubject() !== null) {
+            return $correlationId;
+        }
+        $subject = md5($tableName . ':' . $uid);
+        return $correlationId !== null ? $correlationId->withSubject($subject) : CorrelationId::forSubject($subject);
     }
 
     /**

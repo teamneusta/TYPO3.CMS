@@ -592,7 +592,7 @@ class CrawlerHook
     {
         $url = preg_replace('/\\/\\/$/', '/', $url);
         list($url) = explode('#', $url);
-        if (!strstr($url, '../')) {
+        if (strpos($url, '../') === false) {
             if (GeneralUtility::isFirstPartOfStr($url, $baseUrl)) {
                 if (!in_array($url, $urlLog)) {
                     return $url;
@@ -667,7 +667,7 @@ class CrawlerHook
         // (Re)-Indexing a row from a table:
         $indexerObj = GeneralUtility::makeInstance(\TYPO3\CMS\IndexedSearch\Indexer::class);
         parse_str(str_replace('###UID###', $r['uid'], $cfgRec['get_params']), $GETparams);
-        $indexerObj->backend_initIndexer($cfgRec['pid'], 0, $sys_language_uid, '', $rl, $GETparams, (bool)$cfgRec['chashcalc']);
+        $indexerObj->backend_initIndexer($cfgRec['pid'], 0, $sys_language_uid, '', $rl, $GETparams);
         $indexerObj->backend_setFreeIndexUid($cfgRec['uid'], $cfgRec['set_id']);
         $indexerObj->forceIndexing = true;
         $theContent = '';

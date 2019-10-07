@@ -14,6 +14,8 @@ namespace TYPO3\CMS\Extbase\Tests\Unit\Mvc\Web\Routing;
  *
  * The TYPO3 project - inspiring people to share!
  */
+
+use PHPUnit\Framework\Error\Warning;
 use TYPO3\CMS\Backend\Routing\Route;
 use TYPO3\CMS\Backend\Routing\Router;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -105,7 +107,7 @@ class UriBuilderTest extends UnitTestCase
             ->setAbsoluteUriScheme('https')
             ->setAddQueryString(true)
             ->setArgumentsToBeExcludedFromQueryString(['test' => 'addQueryStringExcludeArguments'])
-            ->setAddQueryStringMethod('GET,POST')
+            ->setAddQueryStringMethod('GET')
             ->setArgumentPrefix('testArgumentPrefix')
             ->setLinkAccessRestrictedPages(true)
             ->setTargetPageUid(123)
@@ -118,7 +120,7 @@ class UriBuilderTest extends UnitTestCase
         $this->assertEquals('https', $this->uriBuilder->getAbsoluteUriScheme());
         $this->assertEquals(true, $this->uriBuilder->getAddQueryString());
         $this->assertEquals(['test' => 'addQueryStringExcludeArguments'], $this->uriBuilder->getArgumentsToBeExcludedFromQueryString());
-        $this->assertEquals('GET,POST', $this->uriBuilder->getAddQueryStringMethod());
+        $this->assertEquals('GET', $this->uriBuilder->getAddQueryStringMethod());
         $this->assertEquals('testArgumentPrefix', $this->uriBuilder->getArgumentPrefix());
         $this->assertEquals(true, $this->uriBuilder->getLinkAccessRestrictedPages());
         $this->assertEquals(123, $this->uriBuilder->getTargetPageUid());
@@ -208,10 +210,9 @@ class UriBuilderTest extends UnitTestCase
         $_GET['id'] = 'pageId';
         $_GET['foo'] = 'bar';
         $_POST = [];
-        $_POST['foo2'] = 'bar2';
         $this->uriBuilder->setAddQueryString(true);
-        $this->uriBuilder->setAddQueryStringMethod('GET,POST');
-        $expectedResult = '/typo3/index.php?route=%2Ftest%2FPath&token=dummyToken&id=pageId&foo=bar&foo2=bar2';
+        $this->uriBuilder->setAddQueryStringMethod('GET');
+        $expectedResult = '/typo3/index.php?route=%2Ftest%2FPath&token=dummyToken&id=pageId&foo=bar';
         $actualResult = $this->uriBuilder->buildBackendUri();
         $this->assertEquals($expectedResult, $actualResult);
     }
@@ -227,7 +228,6 @@ class UriBuilderTest extends UnitTestCase
         $_POST = [];
         $_POST['foo2'] = 'bar2';
         $this->uriBuilder->setAddQueryString(true);
-        $this->uriBuilder->setAddQueryStringMethod(null);
         $expectedResult = '/typo3/index.php?route=%2Ftest%2FPath&token=dummyToken&id=pageId&foo=bar';
         $actualResult = $this->uriBuilder->buildBackendUri();
         $this->assertEquals($expectedResult, $actualResult);
@@ -246,13 +246,10 @@ class UriBuilderTest extends UnitTestCase
                     'foo' => 'bar'
                 ],
                 [
-                    'foo2' => 'bar2'
-                ],
-                [
                     'route',
                     'id'
                 ],
-                '/typo3/index.php?route=%2F&token=dummyToken&foo=bar&foo2=bar2'
+                '/typo3/index.php?route=%2F&token=dummyToken&foo=bar'
             ],
             'Arguments to be excluded in the end' => [
                 [
@@ -261,13 +258,10 @@ class UriBuilderTest extends UnitTestCase
                     'route' => '/test/Path'
                 ],
                 [
-                    'foo2' => 'bar2'
-                ],
-                [
                     'route',
                     'id'
                 ],
-                '/typo3/index.php?route=%2F&token=dummyToken&foo=bar&foo2=bar2'
+                '/typo3/index.php?route=%2F&token=dummyToken&foo=bar'
             ],
             'Arguments in nested array to be excluded' => [
                 [
@@ -278,13 +272,10 @@ class UriBuilderTest extends UnitTestCase
                     'route' => '/test/Path'
                 ],
                 [
-                    'foo2' => 'bar2'
-                ],
-                [
                     'id',
                     'tx_foo[bar]'
                 ],
-                '/typo3/index.php?route=%2Ftest%2FPath&token=dummyToken&foo2=bar2'
+                '/typo3/index.php?route=%2Ftest%2FPath&token=dummyToken'
             ],
             'Arguments in multidimensional array to be excluded' => [
                 [
@@ -297,13 +288,10 @@ class UriBuilderTest extends UnitTestCase
                     'route' => '/test/Path'
                 ],
                 [
-                    'foo2' => 'bar2'
-                ],
-                [
                     'id',
                     'tx_foo[bar][baz]'
                 ],
-                '/typo3/index.php?route=%2Ftest%2FPath&token=dummyToken&foo2=bar2'
+                '/typo3/index.php?route=%2Ftest%2FPath&token=dummyToken'
             ],
         ];
     }
@@ -312,16 +300,14 @@ class UriBuilderTest extends UnitTestCase
      * @test
      * @dataProvider buildBackendUriRemovesSpecifiedQueryParametersIfArgumentsToBeExcludedFromQueryStringIsSetDataProvider
      * @param array $parameters
-     * @param array $postArguments
      * @param array $excluded
      * @param string $expected
      */
-    public function buildBackendUriRemovesSpecifiedQueryParametersIfArgumentsToBeExcludedFromQueryStringIsSet(array $parameters, array $postArguments, array $excluded, $expected)
+    public function buildBackendUriRemovesSpecifiedQueryParametersIfArgumentsToBeExcludedFromQueryStringIsSet(array $parameters, array $excluded, $expected)
     {
         $_GET = array_replace_recursive($_GET, $parameters);
-        $_POST = $postArguments;
         $this->uriBuilder->setAddQueryString(true);
-        $this->uriBuilder->setAddQueryStringMethod('GET,POST');
+        $this->uriBuilder->setAddQueryStringMethod('GET');
         $this->uriBuilder->setArgumentsToBeExcludedFromQueryString($excluded);
         $actualResult = $this->uriBuilder->buildBackendUri();
         $this->assertEquals($expected, $actualResult);
@@ -394,69 +380,46 @@ class UriBuilderTest extends UnitTestCase
     }
 
     /**
-     * @test
+     * @return array
      */
-    public function buildBackendUriWithQueryStringMethodPostGetMergesParameters()
+    public function buildUriDataProvider(): array
     {
-        $_POST = [
-            'key1' => 'POST1',
-            'key2' => 'POST2',
-            'key3' => [
-                'key31' => 'POST31',
-                'key32' => 'POST32',
-                'key33' => [
-                    'key331' => 'POST331',
-                    'key332' => 'POST332',
-                ]
+        $uriPrefix = '/typo3/index.php?route=%2Ftest%2FPath';
+
+        return [
+            'GET,POST' => [
+                'GET,POST',
+                'Assigning addQueryStringMethod = GET,POST or POST,GET is not supported anymore since TYPO3 v10.0 - falling back to GET',
+                $uriPrefix . '&common=GET&get=GET'
+            ],
+            'POST,GET' => [
+                'POST,GET',
+                'Assigning addQueryStringMethod = GET,POST or POST,GET is not supported anymore since TYPO3 v10.0 - falling back to GET',
+                $uriPrefix . '&common=GET&get=GET'
+            ],
+            'POST' => [
+                'POST',
+                'Assigning addQueryStringMethod = POST is not supported anymore since TYPO3 v10.0',
+                $uriPrefix
             ],
         ];
-        $_GET = [
-            'key2' => 'GET2',
-            'key3' => [
-                'key32' => 'GET32',
-                'key33' => [
-                    'key331' => 'GET331',
-                ]
-            ]
-        ];
-        $this->uriBuilder->setAddQueryString(true);
-        $this->uriBuilder->setAddQueryStringMethod('POST,GET');
-        $expectedResult = $this->rawUrlEncodeSquareBracketsInUrl('/typo3/index.php?route=%2F&token=dummyToken&key1=POST1&key2=GET2&key3[key31]=POST31&key3[key32]=GET32&key3[key33][key331]=GET331&key3[key33][key332]=POST332');
-        $actualResult = $this->uriBuilder->buildBackendUri();
-        $this->assertEquals($expectedResult, $actualResult);
     }
 
     /**
+     * @param string $method
+     * @param string $expectedMessage
+     * @param string $expectedResult
+     *
      * @test
+     * @dataProvider buildUriDataProvider
      */
-    public function buildBackendUriWithQueryStringMethodGetPostMergesParameters()
+    public function buildBackendUriHandlesRemovedMethods(string $method, string $expectedMessage, string $expectedResult): void
     {
-        $_GET = [
-            'key1' => 'GET1',
-            'key2' => 'GET2',
-            'key3' => [
-                'key31' => 'GET31',
-                'key32' => 'GET32',
-                'key33' => [
-                    'key331' => 'GET331',
-                    'key332' => 'GET332',
-                ]
-            ],
-        ];
-        $_POST = [
-            'key2' => 'POST2',
-            'key3' => [
-                'key32' => 'POST32',
-                'key33' => [
-                    'key331' => 'POST331',
-                ]
-            ]
-        ];
-        $this->uriBuilder->setAddQueryString(true);
-        $this->uriBuilder->setAddQueryStringMethod('GET,POST');
-        $expectedResult = $this->rawUrlEncodeSquareBracketsInUrl('/typo3/index.php?route=%2F&token=dummyToken&key1=GET1&key2=POST2&key3[key31]=GET31&key3[key32]=POST32&key3[key33][key331]=POST331&key3[key33][key332]=GET332');
-        $actualResult = $this->uriBuilder->buildBackendUri();
-        $this->assertEquals($expectedResult, $actualResult);
+        $_GET = ['common' => 'GET', 'get' => 'GET', 'route' => '/test/Path'];
+        $this->expectException(Warning::class);
+        $this->expectExceptionMessage($expectedMessage);
+        $this->uriBuilder->setAddQueryStringMethod($method);
+        static::assertSame($expectedResult, $this->uriBuilder->buildFrontendUri());
     }
 
     /**
@@ -560,7 +523,22 @@ class UriBuilderTest extends UnitTestCase
      */
     public function resetSetsAllOptionsToTheirDefaultValue()
     {
-        $this->uriBuilder->setArguments(['test' => 'arguments'])->setSection('testSection')->setFormat('someFormat')->setCreateAbsoluteUri(true)->setAddQueryString(true)->setArgumentsToBeExcludedFromQueryString(['test' => 'addQueryStringExcludeArguments'])->setAddQueryStringMethod(null)->setArgumentPrefix('testArgumentPrefix')->setLinkAccessRestrictedPages(true)->setTargetPageUid(123)->setTargetPageType(321)->setNoCache(true);
+        $this->uriBuilder
+            ->setArguments(['test' => 'arguments'])
+            ->setSection('testSection')
+            ->setFormat('someFormat')
+            ->setCreateAbsoluteUri(true)
+            ->setAddQueryString(true)
+            ->setAddQueryStringMethod('test')
+            ->setArgumentsToBeExcludedFromQueryString(['test' => 'addQueryStringExcludeArguments'])
+            ->setLinkAccessRestrictedPages(true)
+            ->setTargetPageUid(123)
+            ->setTargetPageType(321)
+            ->setNoCache(true)
+            ->setArgumentPrefix('testArgumentPrefix')
+            ->setAbsoluteUriScheme('test')
+        ;
+
         $this->uriBuilder->reset();
         $this->assertEquals([], $this->uriBuilder->getArguments());
         $this->assertEquals('', $this->uriBuilder->getSection());
@@ -568,12 +546,14 @@ class UriBuilderTest extends UnitTestCase
         $this->assertEquals(false, $this->uriBuilder->getCreateAbsoluteUri());
         $this->assertEquals(false, $this->uriBuilder->getAddQueryString());
         $this->assertEquals([], $this->uriBuilder->getArgumentsToBeExcludedFromQueryString());
-        $this->assertEquals(null, $this->uriBuilder->getAddQueryStringMethod());
-        $this->assertEquals(null, $this->uriBuilder->getArgumentPrefix());
+        $this->assertEquals('', $this->uriBuilder->getAddQueryStringMethod());
+        $this->assertEquals('', $this->uriBuilder->getArgumentPrefix());
         $this->assertEquals(false, $this->uriBuilder->getLinkAccessRestrictedPages());
         $this->assertEquals(null, $this->uriBuilder->getTargetPageUid());
         $this->assertEquals(0, $this->uriBuilder->getTargetPageType());
         $this->assertEquals(false, $this->uriBuilder->getNoCache());
+        $this->assertEquals(false, $this->uriBuilder->getNoCache());
+        $this->assertEquals(null, $this->uriBuilder->getAbsoluteUriScheme());
     }
 
     /**
@@ -630,8 +610,8 @@ class UriBuilderTest extends UnitTestCase
     {
         $this->uriBuilder->setTargetPageUid(123);
         $this->uriBuilder->setAddQueryString(true);
-        $this->uriBuilder->setAddQueryStringMethod('GET,POST');
-        $expectedConfiguration = ['parameter' => 123, 'addQueryString' => 1, 'addQueryString.' => ['method' => 'GET,POST']];
+        $this->uriBuilder->setAddQueryStringMethod('GET');
+        $expectedConfiguration = ['parameter' => 123, 'addQueryString' => 1, 'addQueryString.' => ['method' => 'GET']];
         $actualConfiguration = $this->uriBuilder->_call('buildTypolinkConfiguration');
         $this->assertEquals($expectedConfiguration, $actualConfiguration);
     }

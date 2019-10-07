@@ -190,9 +190,6 @@ class FrontendLoginControllerTest extends UnitTestCase
         $this->assertSame($expected, $subject->_call('getPreserveGetVars'));
     }
 
-    /**
-     *
-     */
     public function processUserFieldsRespectsDefaultConfigurationForStdWrapDataProvider()
     {
         return [

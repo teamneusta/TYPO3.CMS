@@ -4182,4 +4182,109 @@ return [
             'Breaking-88500-RTEImageHandlingFunctionalityDropped.rst'
         ],
     ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->getButtons' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 0,
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst'
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->thumbCode' => [
+        'numberOfMandatoryArguments' => 3,
+        'maximumNumberOfArguments' => 3,
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst'
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->requestUri' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 0,
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst'
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->writeTop' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 0,
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst'
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->fwd_rwd_nav' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 1,
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst'
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->fwd_rwd_HTML' => [
+        'numberOfMandatoryArguments' => 2,
+        'maximumNumberOfArguments' => 3,
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst'
+        ],
+    ],
+    '\TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::sendNotifyEmail' => [
+        'numberOfMandatoryArguments' => 4,
+        'maximumNumberOfArguments' => 6,
+        'restFiles' => [
+            'Deprecation-88850-ContentObjectRendererSendNotifyEmail.rst'
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->getHistoryEntry' => [
+        'numberOfMandatoryArguments' => 1,
+        'maximumNumberOfArguments' => 1,
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->getHistoryData' => [
+        'numberOfMandatoryArguments' => 2,
+        'maximumNumberOfArguments' => 4,
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->createChangeLog' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 0,
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->shouldPerformRollback' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 0,
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->getElementData' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 0,
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->performRollback' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 0,
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->createMultipleDiff' => [
+        'numberOfMandatoryArguments' => 0,
+        'maximumNumberOfArguments' => 0,
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->setLastHistoryEntry' => [
+        'numberOfMandatoryArguments' => 1,
+        'maximumNumberOfArguments' => 1,
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
 ];

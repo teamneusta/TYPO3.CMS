@@ -13,6 +13,8 @@ namespace TYPO3\CMS\Core\Tests\Functional\Cache\Backend;
  *
  * The TYPO3 project - inspiring people to share!
  */
+
+use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Cache\Backend\RedisBackend;
 use TYPO3\CMS\Core\Cache\Exception\InvalidDataException;
 use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
@@ -34,15 +36,14 @@ class RedisBackendTest extends FunctionalTestCase
      */
     protected function setUp(): void
     {
-
-        // Note this functional does NOT call parent::setUp() since it does
-        // not need a full blown instance and database
         if (!getenv('typo3TestingRedisHost')) {
             $this->markTestSkipped('environment variable "typo3TestingRedisHost" must be set to run this test');
         }
         // Note we assume that if that typo3TestingRedisHost env is set, we can use that for testing,
         // there is no test to see if the daemon is actually up and running. Tests will fail if env
         // is set but daemon is down.
+
+        parent::setUp();
     }
 
     /**
@@ -59,7 +60,9 @@ class RedisBackendTest extends FunctionalTestCase
         $frontendProphecy = $this->prophesize(FrontendInterface::class);
         $frontendProphecy->getIdentifier()->willReturn('pages');
 
+        $GLOBALS['TYPO3_CONF_VARS']['LOG'] = 'only needed for logger initialisation';
         $subject = new RedisBackend('Testing', $backendOptions);
+        $subject->setLogger($this->prophesize(LoggerInterface::class)->reveal());
         $subject->setCache($frontendProphecy->reveal());
         $subject->initializeObject();
         $subject->flush();
@@ -885,7 +888,7 @@ class RedisBackendTest extends FunctionalTestCase
         $identifier = $this->getUniqueId('identifier');
         $subject->set($identifier . 'A', 'data', ['tag']);
         $subject->set($identifier . 'B', 'data', ['tag']);
-        $redis->delete('identData:' . $identifier . 'A');
+        $redis->del('identData:' . $identifier . 'A');
         $subject->collectGarbage();
         $result = $redis->exists('identData:' . $identifier . 'B');
         if (is_int($result)) {
@@ -905,7 +908,7 @@ class RedisBackendTest extends FunctionalTestCase
         $identifier = $this->getUniqueId('identifier');
         $subject->set($identifier . 'A', 'data', ['tag']);
         $subject->set($identifier . 'B', 'data', ['tag']);
-        $redis->delete('identData:' . $identifier . 'A');
+        $redis->del('identData:' . $identifier . 'A');
         $subject->collectGarbage();
         $expectedResult = [false, true];
         $resultA = $redis->exists('identTags:' . $identifier . 'A');
@@ -935,7 +938,7 @@ class RedisBackendTest extends FunctionalTestCase
         $identifier = $this->getUniqueId('identifier');
         $subject->set($identifier . 'A', 'data', ['tag1', 'tag2']);
         $subject->set($identifier . 'B', 'data', ['tag2']);
-        $redis->delete('identData:' . $identifier . 'A');
+        $redis->del('identData:' . $identifier . 'A');
         $subject->collectGarbage();
         $expectedResult = [
             [],

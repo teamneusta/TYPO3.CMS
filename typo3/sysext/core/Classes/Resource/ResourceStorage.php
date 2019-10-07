@@ -303,7 +303,10 @@ class ResourceStorage implements ResourceStorageInterface
      * Returns the capabilities of this storage.
      *
      * @return int
-     * @see CAPABILITY_* constants
+     * @see \TYPO3\CMS\Core\Resource\ResourceStorageInterface::CAPABILITY_BROWSABLE
+     * @see \TYPO3\CMS\Core\Resource\ResourceStorageInterface::CAPABILITY_PUBLIC
+     * @see \TYPO3\CMS\Core\Resource\ResourceStorageInterface::CAPABILITY_WRITABLE
+     * @see \TYPO3\CMS\Core\Resource\ResourceStorageInterface::CAPABILITY_HIERARCHICAL_IDENTIFIERS
      */
     public function getCapabilities()
     {
@@ -820,7 +823,7 @@ class ResourceStorage implements ResourceStorageInterface
             throw new Exception\InsufficientFolderAccessPermissionsException(
                 'You are not allowed to access the given folder: "' . $folder->getName() . '"',
                 1375955684
-                );
+            );
         }
     }
 
@@ -3157,6 +3160,10 @@ class ResourceStorage implements ResourceStorageInterface
     protected function getNearestRecyclerFolder(FileInterface $file)
     {
         if ($file instanceof ProcessedFile) {
+            return null;
+        }
+        // if the storage is not browsable we cannot fetch the parent folder of the file so no recycler handling is possible
+        if (!$this->isBrowsable()) {
             return null;
         }
 

@@ -1,4 +1,5 @@
 <?php
+
 namespace TYPO3\CMS\Extensionmanager\Utility;
 
 /*
@@ -14,14 +15,21 @@ namespace TYPO3\CMS\Extensionmanager\Utility;
  * The TYPO3 project - inspiring people to share!
  */
 
+use Symfony\Component\Finder\Finder;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Configuration\SiteConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\Schema\SchemaMigrator;
 use TYPO3\CMS\Core\Database\Schema\SqlReader;
+use TYPO3\CMS\Core\Log\LogLevel;
+use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Service\OpcodeCacheService;
+use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 use TYPO3\CMS\Extensionmanager\Domain\Model\Extension;
 use TYPO3\CMS\Extensionmanager\Exception\ExtensionManagerException;
+use TYPO3\CMS\Impexp\Import;
 use TYPO3\CMS\Impexp\Utility\ImportExportUtility;
 
 /**
@@ -66,7 +74,7 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
     protected $cacheManager;
 
     /**
-     * @var \TYPO3\CMS\Extbase\SignalSlot\Dispatcher
+     * @var Dispatcher
      */
     protected $signalSlotDispatcher;
 
@@ -132,9 +140,9 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
     }
 
     /**
-     * @param \TYPO3\CMS\Extbase\SignalSlot\Dispatcher $signalSlotDispatcher
+     * @param Dispatcher $signalSlotDispatcher
      */
-    public function injectSignalSlotDispatcher(\TYPO3\CMS\Extbase\SignalSlot\Dispatcher $signalSlotDispatcher)
+    public function injectSignalSlotDispatcher(Dispatcher $signalSlotDispatcher)
     {
         $this->signalSlotDispatcher = $signalSlotDispatcher;
     }
@@ -183,12 +191,13 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
     /**
      * @param string $extensionKey
      */
-    public function processExtensionSetup($extensionKey)
+    public function processExtensionSetup(string $extensionKey): void
     {
         $extension = $this->enrichExtensionWithDetails($extensionKey, false);
         $this->importInitialFiles($extension['siteRelPath'] ?? '', $extensionKey);
         $this->importStaticSqlFile($extension['siteRelPath']);
-        $this->importT3DFile($extension['siteRelPath']);
+        $import = $this->importT3DFile($extension['siteRelPath']);
+        $this->importSiteConfiguration($extension['siteRelPath'], $import);
     }
 
     /**
@@ -307,9 +316,9 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
      *
      * @param string $extensionKey
      * @param bool $loadTerInformation
-     * @internal
      * @return array
      * @throws ExtensionManagerException
+     * @internal
      */
     public function enrichExtensionWithDetails($extensionKey, $loadTerInformation = true)
     {
@@ -443,9 +452,9 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
     /**
      * Checks if an update for an extension is available which also resolves dependencies.
      *
-     * @internal
      * @param Extension $extensionData
      * @return bool
+     * @internal
      */
     public function isUpdateAvailable(Extension $extensionData)
     {
@@ -455,16 +464,16 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
     /**
      * Returns the updateable version for an extension which also resolves dependencies.
      *
-     * @internal
      * @param Extension $extensionData
      * @return bool|Extension FALSE if no update available otherwise latest possible update
+     * @internal
      */
     public function getUpdateableVersion(Extension $extensionData)
     {
         // Only check for update for TER extensions
         $version = $extensionData->getIntegerVersion();
 
-        /** @var $extensionUpdates[] \TYPO3\CMS\Extensionmanager\Domain\Model\Extension */
+        /** @var $extensionUpdates [] \TYPO3\CMS\Extensionmanager\Domain\Model\Extension */
         $extensionUpdates = $this->extensionRepository->findByVersionRangeAndExtensionKeyOrderedByVersion(
             $extensionData->getExtensionKey(),
             $version,
@@ -490,8 +499,9 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
      * Execution state is saved in the this->registry, so it only happens once
      *
      * @param string $extensionSiteRelPath
+     * @return Import|null
      */
-    protected function importT3DFile($extensionSiteRelPath)
+    protected function importT3DFile($extensionSiteRelPath): ?Import
     {
         $registryKeysToCheck = [
             $extensionSiteRelPath . 'Initialisation/data.t3d',
@@ -500,7 +510,7 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
         foreach ($registryKeysToCheck as $registryKeyToCheck) {
             if ($this->registry->get('extensionDataImport', $registryKeyToCheck)) {
                 // Data was imported before => early return
-                return;
+                return null;
             }
         }
         $importFileToUse = null;
@@ -521,11 +531,13 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
                 $importResult = $importExportUtility->importT3DFile(Environment::getPublicPath() . '/' . $importFileToUse, 0);
                 $this->registry->set('extensionDataImport', $extensionSiteRelPath . 'Initialisation/dataImported', 1);
                 $this->emitAfterExtensionT3DImportSignal($importFileToUse, $importResult);
+                return $importExportUtility->getImport();
             } catch (\ErrorException $e) {
-                $logger = $this->objectManager->get(\TYPO3\CMS\Core\Log\LogManager::class)->getLogger(__CLASS__);
-                $logger->log(\TYPO3\CMS\Core\Log\LogLevel::WARNING, $e->getMessage());
+                $logger = $this->objectManager->get(LogManager::class)->getLogger(__CLASS__);
+                $logger->log(LogLevel::WARNING, $e->getMessage());
             }
         }
+        return null;
     }
 
     /**
@@ -606,5 +618,75 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
     protected function emitAfterExtensionFileImportSignal($destinationAbsolutePath)
     {
         $this->signalSlotDispatcher->dispatch(__CLASS__, 'afterExtensionFileImport', [$destinationAbsolutePath, $this]);
+    }
+
+    /**
+     * @param string $extensionSiteRelPath
+     * @param Import|null $import
+     */
+    protected function importSiteConfiguration(string $extensionSiteRelPath, Import $import = null): void
+    {
+        $importRelFolder = $extensionSiteRelPath . 'Initialisation/Site';
+        $importAbsFolder = Environment::getPublicPath() . '/' . $importRelFolder;
+        $destinationFolder = Environment::getConfigPath() . '/sites';
+
+        if (!is_dir($importAbsFolder)) {
+            return;
+        }
+
+        $logger = $this->objectManager->get(LogManager::class)->getLogger(__CLASS__);
+        $siteConfiguration = GeneralUtility::makeInstance(
+            SiteConfiguration::class,
+            $destinationFolder
+        );
+        $existingSites = $siteConfiguration->resolveAllExistingSites(false);
+
+        GeneralUtility::mkdir($destinationFolder);
+        $finder = GeneralUtility::makeInstance(Finder::class);
+        $finder->directories()->in($importAbsFolder);
+        if ($finder->hasResults()) {
+            foreach ($finder as $siteConfigDirectory) {
+                $siteIdentifier = $siteConfigDirectory->getBasename();
+                if (isset($existingSites[$siteIdentifier])) {
+                    $logger->log(
+                        LogLevel::WARNING,
+                        sprintf(
+                            'Skipped importing site configuration from %s due to existing site identifier %s',
+                            $extensionSiteRelPath,
+                            $siteIdentifier
+                        )
+                    );
+                    continue;
+                }
+                $targetDir = $destinationFolder . '/' . $siteIdentifier;
+                if (!$this->registry->get('siteConfigImport', $siteIdentifier) && !is_dir($targetDir)) {
+                    GeneralUtility::mkdir($targetDir);
+                    GeneralUtility::copyDirectory($siteConfigDirectory->getPathname(), $targetDir);
+                    $this->registry->set('siteConfigImport', $siteIdentifier, 1);
+                }
+            }
+        }
+
+        /** @var Site[] $newSites */
+        $newSites = array_diff_key($siteConfiguration->resolveAllExistingSites(false), $existingSites);
+        $importedPages = $import->import_mapId['pages'] ?? null;
+
+        foreach ($newSites as $newSite) {
+            $exportedPageId = $newSite->getRootPageId();
+            $importedPageId = $importedPages[$exportedPageId] ?? null;
+            if ($importedPageId === null) {
+                $logger->log(
+                    LogLevel::WARNING,
+                    sprintf(
+                        'Imported site configuration with identifier %s could not be mapped to imported page id',
+                        $newSite->getIdentifier()
+                    )
+                );
+                continue;
+            }
+            $configuration = $siteConfiguration->load($newSite->getIdentifier());
+            $configuration['rootPageId'] = $importedPageId;
+            $siteConfiguration->write($newSite->getIdentifier(), $configuration);
+        }
     }
 }

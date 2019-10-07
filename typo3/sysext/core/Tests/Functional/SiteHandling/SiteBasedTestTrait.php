@@ -17,6 +17,7 @@ namespace TYPO3\CMS\Core\Tests\Functional\SiteHandling;
 
 use TYPO3\CMS\Core\Configuration\SiteConfiguration;
 use TYPO3\CMS\Core\Tests\Functional\Fixtures\Frontend\PhpError;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Trait used for test classes that want to set up (= write) site configuration files.
@@ -27,6 +28,21 @@ use TYPO3\CMS\Core\Tests\Functional\Fixtures\Frontend\PhpError;
  */
 trait SiteBasedTestTrait
 {
+    /**
+     * @param array $items
+     */
+    protected static function failIfArrayIsNotEmpty(array $items): void
+    {
+        if (empty($items)) {
+            return;
+        }
+
+        static::fail(
+            'Array was not empty as expected, but contained these items:' . LF
+            . '* ' . implode(LF . '* ', $items)
+        );
+    }
+
     /**
      * @param string $identifier
      * @param array $site
@@ -46,12 +62,13 @@ trait SiteBasedTestTrait
         if (!empty($errorHandling)) {
             $configuration['errorHandling'] = $errorHandling;
         }
-
         $siteConfiguration = new SiteConfiguration(
             $this->instancePath . '/typo3conf/sites/'
         );
 
         try {
+            // ensure no previous site configuration influences the test
+            GeneralUtility::rmdir($this->instancePath . '/typo3conf/sites/' . $identifier, true);
             $siteConfiguration->write($identifier, $configuration);
         } catch (\Exception $exception) {
             $this->markTestSkipped($exception->getMessage());

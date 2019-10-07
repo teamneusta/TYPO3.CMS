@@ -21,9 +21,9 @@ use TYPO3\CMS\Adminpanel\Log\InMemoryLogWriter;
 use TYPO3\CMS\Adminpanel\ModuleApi\AbstractSubModule;
 use TYPO3\CMS\Adminpanel\ModuleApi\ContentProviderInterface;
 use TYPO3\CMS\Adminpanel\ModuleApi\DataProviderInterface;
-use TYPO3\CMS\Adminpanel\ModuleApi\InitializableInterface;
 use TYPO3\CMS\Adminpanel\ModuleApi\ModuleData;
 use TYPO3\CMS\Adminpanel\ModuleApi\ModuleSettingsProviderInterface;
+use TYPO3\CMS\Adminpanel\ModuleApi\RequestEnricherInterface;
 use TYPO3\CMS\Adminpanel\Service\ConfigurationService;
 use TYPO3\CMS\Core\Log\LogLevel;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -34,9 +34,12 @@ use TYPO3\CMS\Fluid\View\StandaloneView;
  *
  * @internal
  */
-class Log extends AbstractSubModule implements DataProviderInterface, ContentProviderInterface, ModuleSettingsProviderInterface, InitializableInterface
+class Log extends AbstractSubModule implements DataProviderInterface, ContentProviderInterface, ModuleSettingsProviderInterface, RequestEnricherInterface
 {
-    protected $logLevel = LogLevel::INFO;
+    /**
+     * @var int
+     */
+    protected $logLevel;
 
     /**
      * @var ConfigurationService
@@ -45,6 +48,7 @@ class Log extends AbstractSubModule implements DataProviderInterface, ContentPro
 
     public function __construct()
     {
+        $this->logLevel = LogLevel::normalizeLevel(LogLevel::INFO);
         $this->configurationService = GeneralUtility::makeInstance(ConfigurationService::class);
     }
 
@@ -73,8 +77,9 @@ class Log extends AbstractSubModule implements DataProviderInterface, ContentPro
      */
     public function getDataToStore(ServerRequestInterface $request): ModuleData
     {
+        $maxLevel = LogLevel::normalizeLevel(LogLevel::DEBUG);
         $levels = [];
-        for ($i = 1; $i <= LogLevel::DEBUG; $i++) {
+        for ($i = 1; $i <= $maxLevel; $i++) {
             $levels[] = [
                 'level' => $i,
                 'levelName' => LogLevel::getName($i),
@@ -110,8 +115,9 @@ class Log extends AbstractSubModule implements DataProviderInterface, ContentPro
         $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName($templateNameAndPath));
         $view->setPartialRootPaths(['EXT:adminpanel/Resources/Private/Partials']);
 
+        $maxLevel = LogLevel::normalizeLevel(LogLevel::DEBUG);
         $levels = [];
-        for ($i = 1; $i <= LogLevel::DEBUG; $i++) {
+        for ($i = 1; $i <= $maxLevel; $i++) {
             $levels[] = [
                 'level' => $i,
                 'levelName' => LogLevel::getName($i),
@@ -148,11 +154,11 @@ class Log extends AbstractSubModule implements DataProviderInterface, ContentPro
         $groupByLevel = $this->getConfigOption('groupByLevel');
 
         foreach ($data['log'] as $logRecord) {
-            if ($logRecord['level'] > $this->logLevel) {
+            if (LogLevel::normalizeLevel($logRecord['level']) > $this->logLevel) {
                 continue;
             }
             if ($groupByComponent && $groupByLevel) {
-                $sortedLog[$logRecord['component']][LogLevel::getName($logRecord['level'])][] = $logRecord;
+                $sortedLog[$logRecord['component']][$logRecord['level']][] = $logRecord;
             } elseif ($groupByComponent) {
                 $sortedLog[$logRecord['component']][] = $logRecord;
             } elseif ($groupByLevel) {
@@ -172,7 +178,7 @@ class Log extends AbstractSubModule implements DataProviderInterface, ContentPro
     /**
      * @inheritdoc
      */
-    public function initializeModule(ServerRequestInterface $request): void
+    public function enrich(ServerRequestInterface $request): ServerRequestInterface
     {
         $this->logLevel = $this->getConfigOption('startLevel');
 
@@ -183,6 +189,7 @@ class Log extends AbstractSubModule implements DataProviderInterface, ContentPro
         $GLOBALS['TYPO3_CONF_VARS']['LOG'] = array_filter(
             $configWithInMemoryWriter
         );
+        return $request;
     }
 
     protected function setLoggingConfigRecursive(array $logConfig): array

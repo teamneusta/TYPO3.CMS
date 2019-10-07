@@ -44,7 +44,6 @@ use TYPO3\CMS\Core\Site\Entity\NullSite;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
-use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\HttpUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
@@ -842,7 +841,7 @@ class PageLayoutView implements LoggerAwareInterface
         $pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/LayoutModule/DragDrop');
         $pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/Modal');
         $pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/LayoutModule/Paste');
-        $pageActionsCallback = '';
+        $pageActionsCallback = null;
         if ($this->isPageEditable()) {
             $languageOverlayId = 0;
             $pageLocalizationRecord = BackendUtility::getRecordLocalization('pages', $this->id, (int)$this->tt_contentConfig['sys_language_uid']);
@@ -1797,7 +1796,7 @@ class PageLayoutView implements LoggerAwareInterface
                     break;
                 case 'shortcut':
                 case 'shortcut_mode':
-                    if ((int)$row['doktype'] === \TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_SHORTCUT) {
+                    if ((int)$row['doktype'] === \TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_SHORTCUT) {
                         $theData[$field] = $this->getPagesTableFieldValue($field, $row);
                     }
                     break;
@@ -1849,8 +1848,9 @@ class PageLayoutView implements LoggerAwareInterface
         if ($this->tt_contentConfig['showCommands']) {
             // Edit whole of column:
             if ($editParams && $this->getBackendUser()->doesUserHaveAccess($this->pageinfo, Permission::CONTENT_EDIT) && $this->getBackendUser()->checkLanguageAccess(0)) {
-                $iconsArr['edit'] = '<a href="#" onclick="'
-                    . htmlspecialchars(BackendUtility::editOnClick($editParams)) . '" title="'
+                $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
+                $link = $uriBuilder->buildUriFromRoute('record_edit') . $editParams . '&returnUrl=' . rawurlencode(GeneralUtility::getIndpEnv('REQUEST_URI'));
+                $iconsArr['edit'] = '<a href="' . htmlspecialchars($link) . '"  title="'
                     . htmlspecialchars($this->getLanguageService()->getLL('editColumn')) . '">'
                     . $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '</a>';
             }
@@ -2000,11 +2000,11 @@ class PageLayoutView implements LoggerAwareInterface
                         $row['uid'],
                         ' ' . $this->getLanguageService()->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.referencesToRecord'),
                         $this->getReferenceCount('tt_content', $row['uid'])
-                        ) . BackendUtility::translationCount(
-                            'tt_content',
-                            $row['uid'],
-                            ' ' . $this->getLanguageService()->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.translationsOfRecord')
-                        );
+                    ) . BackendUtility::translationCount(
+                        'tt_content',
+                        $row['uid'],
+                        ' ' . $this->getLanguageService()->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.translationsOfRecord')
+                    );
                     $confirm = $this->getLanguageService()->getLL('deleteWarning')
                         . $refCountMsg;
                     $out .= '<a class="btn btn-default t3js-modal-trigger" href="' . htmlspecialchars(BackendUtility::getLinkToDataHandlerAction($params)) . '"'
@@ -2277,7 +2277,7 @@ class PageLayoutView implements LoggerAwareInterface
                     }
                     $out .= htmlspecialchars($this->getLanguageService()->sL(
                         BackendUtility::getLabelFromItemlist('tt_content', 'pages', $row['pages'])
-                        )) . '<br />';
+                    )) . '<br />';
                     break;
                 default:
                     $contentType = $this->CType_labels[$row['CType']];
@@ -2450,36 +2450,6 @@ class PageLayoutView implements LoggerAwareInterface
         }
 
         return $theNewButton;
-    }
-
-    /**
-     * Creates onclick-attribute content for a new content element
-     *
-     * @param int $id Page id where to create the element.
-     * @param int $colPos Preset: Column position value
-     * @param int $sys_language Preset: Sys language value
-     * @return string String for onclick attribute.
-     * @see getTable_tt_content()
-     */
-    public function newContentElementOnClick($id, $colPos, $sys_language)
-    {
-        if ($this->option_newWizard) {
-            $routeName = BackendUtility::getPagesTSconfig($id)['mod.']['newContentElementWizard.']['override']
-                ?? 'new_content_element_wizard';
-            $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
-            $url = $uriBuilder->buildUriFromRoute($routeName, [
-                'id' => $id,
-                'colPos' => $colPos,
-                'sys_language_uid' => $sys_language,
-                'uid_pid' => $id,
-                'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
-            ]);
-            $onClick = 'window.location.href=' . GeneralUtility::quoteJSvalue((string)$url) . ';';
-        } else {
-            $onClick = BackendUtility::editOnClick('&edit[tt_content][' . $id . ']=new&defVals[tt_content][colPos]='
-                . $colPos . '&defVals[tt_content][sys_language_uid]=' . $sys_language);
-        }
-        return $onClick;
     }
 
     /**
@@ -2989,9 +2959,6 @@ class PageLayoutView implements LoggerAwareInterface
         $this->sortRev = GeneralUtility::_GP('sortRev');
         $this->displayFields = GeneralUtility::_GP('displayFields');
         $this->duplicateField = GeneralUtility::_GP('duplicateField');
-        if (GeneralUtility::_GP('justLocalized')) {
-            $this->localizationRedirect(GeneralUtility::_GP('justLocalized'));
-        }
         // Init dynamic vars:
         $this->counter = 0;
         $this->JScode = '';
@@ -3192,11 +3159,11 @@ class PageLayoutView implements LoggerAwareInterface
         foreach ($searchLevelItems as $kv => $label) {
             $opt[] = '<option value="' . $kv . '"' . ($kv === $this->searchLevels ? ' selected="selected"' : '') . '>' . htmlspecialchars(
                 $label
-                ) . '</option>';
+            ) . '</option>';
         }
         $lMenu = '<select class="form-control" name="search_levels" title="' . htmlspecialchars(
             $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.title.search_levels')
-            ) . '" id="search_levels">' . implode('', $opt) . '</select>';
+        ) . '" id="search_levels">' . implode('', $opt) . '</select>';
         // Table with the search box:
         $content = '<div class="db_list-searchbox-form db_list-searchbox-toolbar module-docheader-bar module-docheader-bar-search t3js-module-docheader-bar t3js-module-docheader-bar-search" id="db_list-searchbox-toolbar" style="display: ' . ($this->searchString == '' ? 'none' : 'block') . ';">
 			' . $formElements[0] . '
@@ -3207,34 +3174,34 @@ class PageLayoutView implements LoggerAwareInterface
                                 <div class="form-group col-xs-12">
                                     <label for="search_field">' . htmlspecialchars(
             $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.label.searchString')
-            ) . ': </label>
+        ) . ': </label>
 									<input class="form-control" type="search" placeholder="' . htmlspecialchars(
-                $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.enterSearchString')
-            ) . '" title="' . htmlspecialchars(
-                $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.title.searchString')
-            ) . '" name="search_field" id="search_field" value="' . htmlspecialchars($this->searchString) . '" />
+            $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.enterSearchString')
+        ) . '" title="' . htmlspecialchars(
+            $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.title.searchString')
+        ) . '" name="search_field" id="search_field" value="' . htmlspecialchars($this->searchString) . '" />
                                 </div>
                                 <div class="form-group col-xs-12 col-sm-6">
 									<label for="search_levels">' . htmlspecialchars(
-                $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.label.search_levels')
-            ) . ': </label>
+            $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.label.search_levels')
+        ) . ': </label>
 									' . $lMenu . '
                                 </div>
                                 <div class="form-group col-xs-12 col-sm-6">
 									<label for="showLimit">' . htmlspecialchars(
-                $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.label.limit')
-            ) . ': </label>
+            $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.label.limit')
+        ) . ': </label>
 									<input class="form-control" type="number" min="0" max="10000" placeholder="10" title="' . htmlspecialchars(
-                $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.title.limit')
-            ) . '" name="showLimit" id="showLimit" value="' . htmlspecialchars(
-                ($this->showLimit ? $this->showLimit : '')
-            ) . '" />
+            $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.title.limit')
+        ) . '" name="showLimit" id="showLimit" value="' . htmlspecialchars(
+            ($this->showLimit ? $this->showLimit : '')
+        ) . '" />
                                 </div>
                                 <div class="form-group col-xs-12">
                                     <div class="form-control-wrap">
                                         <button type="submit" class="btn btn-default" name="search" title="' . htmlspecialchars(
-                $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.title.search')
-            ) . '">
+            $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.title.search')
+        ) . '">
                                             ' . $this->iconFactory->getIcon('actions-search', Icon::SIZE_SMALL)->render(
             ) . ' ' . htmlspecialchars(
                 $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.search')
@@ -3566,106 +3533,6 @@ class PageLayoutView implements LoggerAwareInterface
     }
 
     /**
-     * Returns the title (based on $code) of a table ($table) with the proper link around. For headers over tables.
-     * The link will cause the display of all extended mode or not for the table.
-     *
-     * @param string $table Table name
-     * @param string $code Table label
-     * @return string The linked table label
-     */
-    public function linkWrapTable($table, $code)
-    {
-        if ($this->table !== $table) {
-            return '<a href="' . htmlspecialchars(
-                $this->listURL('', $table, 'firstElementNumber')
-                ) . '">' . $code . '</a>';
-        }
-        return '<a href="' . htmlspecialchars(
-            $this->listURL('', '', 'sortField,sortRev,table,firstElementNumber')
-            ) . '">' . $code . '</a>';
-    }
-
-    /**
-     * Returns the title (based on $code) of a record (from table $table) with the proper link around (that is for 'pages'-records a link to the level of that record...)
-     *
-     * @param string $table Table name
-     * @param int $uid Item uid
-     * @param string $code Item title (not htmlspecialchars()'ed yet)
-     * @param mixed[] $row Item row
-     * @return string The item title. Ready for HTML output (is htmlspecialchars()'ed)
-     */
-    public function linkWrapItems($table, $uid, $code, $row)
-    {
-        $lang = $this->getLanguageService();
-        $origCode = $code;
-        // If the title is blank, make a "no title" label:
-        if ((string)$code === '') {
-            $code = '<i>[' . htmlspecialchars(
-                $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.no_title')
-                ) . ']</i> - '
-                . htmlspecialchars(BackendUtility::getRecordTitle($table, $row));
-        } else {
-            $code = htmlspecialchars($code, ENT_QUOTES, 'UTF-8', false);
-            if ($code != htmlspecialchars($origCode)) {
-                $code = '<span title="' . htmlspecialchars(
-                    $origCode,
-                    ENT_QUOTES,
-                    'UTF-8',
-                    false
-                    ) . '">' . $code . '</span>';
-            }
-        }
-        switch ((string)$this->clickTitleMode) {
-            case 'edit':
-                // If the listed table is 'pages' we have to request the permission settings for each page:
-                if ($table === 'pages') {
-                    $localCalcPerms = $this->getBackendUser()->calcPerms(
-                        BackendUtility::getRecord('pages', $row['uid'])
-                    );
-                    $permsEdit = $localCalcPerms & Permission::PAGE_EDIT;
-                } else {
-                    $permsEdit = $this->calcPerms & Permission::CONTENT_EDIT;
-                }
-                // "Edit" link: ( Only if permissions to edit the page-record of the content of the parent page ($this->id)
-                if ($permsEdit) {
-                    $params = '&edit[' . $table . '][' . $row['uid'] . ']=edit';
-                    $code = '<a href="#" onclick="' . htmlspecialchars(
-                        BackendUtility::editOnClick($params, '', -1)
-                        ) . '" title="' . htmlspecialchars($lang->getLL('edit')) . '">' . $code . '</a>';
-                }
-                break;
-            case 'show':
-                // "Show" link (only pages and tt_content elements)
-                if ($table === 'pages' || $table === 'tt_content') {
-                    $code = '<a href="#" onclick="' . htmlspecialchars(
-                        BackendUtility::viewOnClick(
-                            ($table === 'tt_content' ? $this->id . '#' . $row['uid'] : $row['uid'])
-                            )
-                        ) . '" title="' . htmlspecialchars(
-                            $lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.showPage')
-                        ) . '">' . $code . '</a>';
-                }
-                break;
-            case 'info':
-                // "Info": (All records)
-                $code = '<a href="#" onclick="' . htmlspecialchars(
-                    'top.TYPO3.InfoWindow.showItem(\'' . $table . '\', \'' . $row['uid'] . '\'); return false;'
-                    ) . '" title="' . htmlspecialchars($lang->getLL('showInfo')) . '">' . $code . '</a>';
-                break;
-            default:
-                // Output the label now:
-                if ($table === 'pages') {
-                    $code = '<a href="' . htmlspecialchars(
-                        $this->listURL($uid, '', 'firstElementNumber')
-                        ) . '" onclick="setHighlight(' . $uid . ')">' . $code . '</a>';
-                } else {
-                    $code = $this->linkUrlMail($code, $origCode);
-                }
-        }
-        return $code;
-    }
-
-    /**
      * Wrapping input code in link to URL or email if $testString is either.
      *
      * @param string $code code to wrap
@@ -3771,14 +3638,14 @@ class PageLayoutView implements LoggerAwareInterface
         // Check table:
         if (is_array($GLOBALS['TCA'][$table]) && isset($GLOBALS['TCA'][$table]['columns']) && is_array(
             $GLOBALS['TCA'][$table]['columns']
-            )) {
+        )) {
             if (isset($GLOBALS['TCA'][$table]['columns']) && is_array($GLOBALS['TCA'][$table]['columns'])) {
                 // Traverse configured columns and add them to field array, if available for user.
                 foreach ($GLOBALS['TCA'][$table]['columns'] as $fN => $fieldValue) {
                     if ($dontCheckUser || (!$fieldValue['exclude'] || $backendUser->check(
                         'non_exclude_fields',
                         $table . ':' . $fN
-                            )) && $fieldValue['config']['type'] !== 'passthrough') {
+                    )) && $fieldValue['config']['type'] !== 'passthrough') {
                         $fieldListArr[] = $fN;
                     }
                 }
@@ -3803,8 +3670,8 @@ class PageLayoutView implements LoggerAwareInterface
                     if ($GLOBALS['TCA'][$table]['ctrl']['sortby']) {
                         $fieldListArr[] = $GLOBALS['TCA'][$table]['ctrl']['sortby'];
                     }
-                    if (ExtensionManagementUtility::isLoaded('workspaces')
-                        && $GLOBALS['TCA'][$table]['ctrl']['versioningWS']) {
+                    if (BackendUtility::isTableWorkspaceEnabled($table)) {
+                        $fieldListArr[] = 't3ver_oid';
                         $fieldListArr[] = 't3ver_state';
                         $fieldListArr[] = 't3ver_wsid';
                     }
@@ -3814,56 +3681,6 @@ class PageLayoutView implements LoggerAwareInterface
             }
         }
         return $fieldListArr;
-    }
-
-    /**
-     * Redirects to FormEngine if a record is just localized.
-     *
-     * @param string $justLocalized String with table, orig uid and language separated by ":
-     */
-    public function localizationRedirect($justLocalized)
-    {
-        list($table, $orig_uid, $language) = explode(':', $justLocalized);
-        if ($GLOBALS['TCA'][$table]
-            && $GLOBALS['TCA'][$table]['ctrl']['languageField']
-            && $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']
-        ) {
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($table);
-            $queryBuilder->getRestrictions()
-                ->removeAll()
-                ->add(GeneralUtility::makeInstance(DeletedRestriction::class))
-                ->add(GeneralUtility::makeInstance(BackendWorkspaceRestriction::class));
-
-            $localizedRecordUid = $queryBuilder->select('uid')
-                ->from($table)
-                ->where(
-                    $queryBuilder->expr()->eq(
-                        $GLOBALS['TCA'][$table]['ctrl']['languageField'],
-                        $queryBuilder->createNamedParameter($language, \PDO::PARAM_INT)
-                    ),
-                    $queryBuilder->expr()->eq(
-                        $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'],
-                        $queryBuilder->createNamedParameter($orig_uid, \PDO::PARAM_INT)
-                    )
-                )
-                ->setMaxResults(1)
-                ->execute()
-                ->fetchColumn();
-
-            if ($localizedRecordUid !== false) {
-                // Create parameters and finally run the classic page module for creating a new page translation
-                $url = $this->listURL();
-                $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
-                $editUserAccountUrl = (string)$uriBuilder->buildUriFromRoute(
-                    'record_edit',
-                    [
-                        'edit[' . $table . '][' . $localizedRecordUid . ']' => 'edit',
-                        'returnUrl' => $url
-                    ]
-                );
-                HttpUtility::redirect($editUserAccountUrl);
-            }
-        }
     }
 
     /**
@@ -4173,14 +3990,14 @@ class PageLayoutView implements LoggerAwareInterface
                 $content = '<a href="' . htmlspecialchars($href) . '">' . $this->iconFactory->getIcon(
                     'actions-move-up',
                     Icon::SIZE_SMALL
-                    )->render() . '</a> <i>[' . (max(0, $pointer - $this->iLimit) + 1) . ' - ' . $pointer . ']</i>';
+                )->render() . '</a> <i>[' . (max(0, $pointer - $this->iLimit) + 1) . ' - ' . $pointer . ']</i>';
                 break;
             case 'rwd':
                 $href = $this->listURL() . '&pointer=' . $pointer . $tParam;
                 $content = '<a href="' . htmlspecialchars($href) . '">' . $this->iconFactory->getIcon(
                     'actions-move-down',
                     Icon::SIZE_SMALL
-                    )->render() . '</a> <i>[' . ($pointer + 1) . ' - ' . $this->totalItems . ']</i>';
+                )->render() . '</a> <i>[' . ($pointer + 1) . ' - ' . $this->totalItems . ']</i>';
                 break;
         }
         return $content;
@@ -4320,13 +4137,13 @@ class PageLayoutView implements LoggerAwareInterface
             if ($launchViewParameter !== '') {
                 $htmlCode .= ' onclick="' . htmlspecialchars(
                     'top.TYPO3.InfoWindow.showItem(' . $launchViewParameter . '); return false;'
-                    ) . '"';
+                ) . '"';
             }
             $htmlCode .= ' title="' . htmlspecialchars(
                 $this->getLanguageService()->sL(
                     'LLL:EXT:backend/Resources/Private/Language/locallang.xlf:show_references'
-                    ) . ' (' . $references . ')'
-                ) . '">';
+                ) . ' (' . $references . ')'
+            ) . '">';
             $htmlCode .= $references;
             $htmlCode .= '</a>';
         }

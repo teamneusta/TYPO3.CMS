@@ -19,23 +19,24 @@ namespace TYPO3\CMS\Adminpanel\Modules\TsDebug;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Adminpanel\ModuleApi\AbstractSubModule;
 use TYPO3\CMS\Adminpanel\ModuleApi\ContentProviderInterface;
-use TYPO3\CMS\Adminpanel\ModuleApi\InitializableInterface;
 use TYPO3\CMS\Adminpanel\ModuleApi\ModuleData;
 use TYPO3\CMS\Adminpanel\ModuleApi\ModuleSettingsProviderInterface;
+use TYPO3\CMS\Adminpanel\ModuleApi\RequestEnricherInterface;
 use TYPO3\CMS\Adminpanel\Service\ConfigurationService;
 use TYPO3\CMS\Backend\FrontendBackendUserAuthentication;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Core\Context\TypoScriptAspect;
 use TYPO3\CMS\Core\TimeTracker\TimeTracker;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
-use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
 
 /**
  * Class TypoScriptWaterfall
  *
  * @internal
  */
-class TypoScriptWaterfall extends AbstractSubModule implements InitializableInterface, ContentProviderInterface, ModuleSettingsProviderInterface
+class TypoScriptWaterfall extends AbstractSubModule implements RequestEnricherInterface, ContentProviderInterface, ModuleSettingsProviderInterface
 {
     /**
      * @var ConfigurationService
@@ -68,16 +69,14 @@ class TypoScriptWaterfall extends AbstractSubModule implements InitializableInte
     /**
      * @inheritdoc
      */
-    public function initializeModule(ServerRequestInterface $request): void
+    public function enrich(ServerRequestInterface $request): ServerRequestInterface
     {
-        $typoScriptFrontend = $this->getTypoScriptFrontendController();
-        $typoScriptFrontend->forceTemplateParsing = $this->getConfigurationOption(
-            'forceTemplateParsing'
-        );
-        if ($typoScriptFrontend->forceTemplateParsing) {
-            $typoScriptFrontend->set_no_cache('Admin Panel: Force template parsing', true);
+        if ($this->getConfigurationOption('forceTemplateParsing')) {
+            GeneralUtility::makeInstance(Context::class)->setAspect('typoscript', GeneralUtility::makeInstance(TypoScriptAspect::class, true));
+            $request = $request->withAttribute('noCache', true);
         }
         $this->getTimeTracker()->LR = (bool)$this->getConfigurationOption('LR');
+        return $request;
     }
 
     /**
@@ -182,13 +181,5 @@ class TypoScriptWaterfall extends AbstractSubModule implements InitializableInte
     protected function getTimeTracker(): TimeTracker
     {
         return GeneralUtility::makeInstance(TimeTracker::class);
-    }
-
-    /**
-     * @return TypoScriptFrontendController
-     */
-    protected function getTypoScriptFrontendController(): TypoScriptFrontendController
-    {
-        return $GLOBALS['TSFE'];
     }
 }

@@ -29,6 +29,7 @@ use Psr\Http\Message\ServerRequestInterface;
  *
  * @see \TYPO3\CMS\Adminpanel\Middleware\AdminPanelInitiator::process()
  * @see \TYPO3\CMS\Adminpanel\Controller\MainController::initialize()
+ * @deprecated Use RequestEnricherInterface instead
  */
 interface InitializableInterface
 {
@@ -36,6 +37,7 @@ interface InitializableInterface
      * Initialize the module - runs early in a TYPO3 request
      *
      * @param ServerRequestInterface $request
+     * @deprecated
      */
     public function initializeModule(ServerRequestInterface $request): void;
 }

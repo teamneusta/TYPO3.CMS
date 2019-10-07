@@ -82,12 +82,12 @@ return [
                     ],
                     [
                         'LLL:EXT:core/Resources/Private/Language/locallang_tca.xlf:doktype.I.0',
-                        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_DEFAULT,
+                        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_DEFAULT,
                         'apps-pagetree-page-default'
                     ],
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.doktype.I.4',
-                        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_BE_USER_SECTION,
+                        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_BE_USER_SECTION,
                         'apps-pagetree-page-backend-users'
                     ],
                     [
@@ -96,17 +96,17 @@ return [
                     ],
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.doktype.I.2',
-                        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_SHORTCUT,
+                        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_SHORTCUT,
                         'apps-pagetree-page-shortcut'
                     ],
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.doktype.I.5',
-                        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_MOUNTPOINT,
+                        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_MOUNTPOINT,
                         'apps-pagetree-page-mountpoint'
                     ],
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.doktype.I.8',
-                        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_LINK,
+                        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_LINK,
                         'apps-pagetree-page-shortcut-external'
                     ],
                     [
@@ -115,21 +115,21 @@ return [
                     ],
                     [
                         'LLL:EXT:core/Resources/Private/Language/locallang_tca.xlf:doktype.I.folder',
-                        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_SYSFOLDER,
+                        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_SYSFOLDER,
                         'apps-pagetree-folder-default'
                     ],
                     [
                         'LLL:EXT:core/Resources/Private/Language/locallang_tca.xlf:doktype.I.2',
-                        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_RECYCLER,
+                        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_RECYCLER,
                         'apps-filetree-folder-recycler'
                     ],
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.doktype.I.7',
-                        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_SPACER,
+                        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_SPACER,
                         'apps-pagetree-spacer'
                     ]
                 ],
-                'default' => (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_DEFAULT,
+                'default' => (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_DEFAULT,
             ]
         ],
         'title' => [
@@ -281,7 +281,6 @@ return [
                 'type' => 'select',
                 'renderType' => 'selectSingle',
                 'foreign_table' => 'sys_language',
-                'foreign_table_where' => 'ORDER BY sys_language.sorting',
                 'items' => [], // no default language here, as the pages table is always the default language
                 'default' => 0,
                 'fieldWizard' => [
@@ -355,8 +354,6 @@ return [
                 ],
                 'exclusiveKeys' => '-1,-2',
                 'foreign_table' => 'fe_groups',
-                'foreign_table_where' => 'ORDER BY fe_groups.title',
-                'enableMultiSelectFilterTextfield' => true
             ]
         ],
         'extendToSubpages' => [
@@ -386,7 +383,6 @@ return [
         ],
         'nav_hide' => [
             'exclude' => true,
-            'l10n_mode' => 'prefixLangTitle',
             'label' => 'LLL:EXT:core/Resources/Private/Language/locallang_tca.xlf:pages.nav_hide_toggle',
             'config' => [
                 'type' => 'check',
@@ -397,6 +393,9 @@ return [
                         1 => '',
                         'invertStateDisplay' => true
                     ]
+                ],
+                'behaviour' => [
+                    'allowLanguageSynchronization' => true
                 ],
             ]
         ],
@@ -581,19 +580,19 @@ return [
                 'items' => [
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.shortcut_mode.I.0',
-                        \TYPO3\CMS\Frontend\Page\PageRepository::SHORTCUT_MODE_NONE
+                        \TYPO3\CMS\Core\Domain\Repository\PageRepository::SHORTCUT_MODE_NONE
                     ],
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.shortcut_mode.I.1',
-                        \TYPO3\CMS\Frontend\Page\PageRepository::SHORTCUT_MODE_FIRST_SUBPAGE
+                        \TYPO3\CMS\Core\Domain\Repository\PageRepository::SHORTCUT_MODE_FIRST_SUBPAGE
                     ],
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.shortcut_mode.I.2',
-                        \TYPO3\CMS\Frontend\Page\PageRepository::SHORTCUT_MODE_RANDOM_SUBPAGE
+                        \TYPO3\CMS\Core\Domain\Repository\PageRepository::SHORTCUT_MODE_RANDOM_SUBPAGE
                     ],
                     [
                         'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.shortcut_mode.I.3',
-                        \TYPO3\CMS\Frontend\Page\PageRepository::SHORTCUT_MODE_PARENT_PAGE
+                        \TYPO3\CMS\Core\Domain\Repository\PageRepository::SHORTCUT_MODE_PARENT_PAGE
                     ]
                 ],
                 'default' => 0,
@@ -604,7 +603,6 @@ return [
         ],
         'content_from_pid' => [
             'exclude' => true,
-            'l10n_mode' => 'prefixLangTitle',
             'label' => 'LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.content_from_pid',
             'config' => [
                 'type' => 'group',
@@ -619,8 +617,11 @@ return [
                         'addWhere' => ' AND pages.uid != ###THIS_UID###'
                     ]
                 ],
-                'default' => 0
-            ]
+                'default' => 0,
+                'behaviour' => [
+                    'allowLanguageSynchronization' => true
+                ],
+            ],
         ],
         'mount_pid' => [
             'l10n_mode' => 'exclude',
@@ -891,14 +892,13 @@ return [
                 'renderType' => 'selectMultipleSideBySide',
                 'size' => 10,
                 'items' => [],
-                'enableMultiSelectFilterTextfield' => true,
-                'softref' => 'ext_fileref'
+                'softref' => 'ext_fileref',
             ]
         ],
     ],
     'types' => [
         // normal
-        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_DEFAULT => [
+        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_DEFAULT => [
             'showitem' => '
                 --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
                     --palette--;;standard,
@@ -931,7 +931,7 @@ return [
             '
         ],
         // external URL
-        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_LINK => [
+        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_LINK => [
             'showitem' => '
                 --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
                     doktype,
@@ -961,7 +961,7 @@ return [
             '
         ],
         // shortcut
-        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_SHORTCUT => [
+        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_SHORTCUT => [
             'showitem' => '
                 --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
                     doktype,
@@ -992,7 +992,7 @@ return [
             '
         ],
         // mount page
-        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_MOUNTPOINT => [
+        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_MOUNTPOINT => [
             'showitem' => '
                 --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
                     doktype,
@@ -1023,7 +1023,7 @@ return [
             '
         ],
         // spacer
-        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_SPACER => [
+        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_SPACER => [
             'showitem' => '
                 --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
                     --palette--;;standard,
@@ -1043,7 +1043,7 @@ return [
             '
         ],
         // Folder
-        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_SYSFOLDER => [
+        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_SYSFOLDER => [
             'showitem' => '
                 --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
                     --palette--;;standard,
@@ -1066,7 +1066,7 @@ return [
             '
         ],
         // Trash
-        (string)\TYPO3\CMS\Frontend\Page\PageRepository::DOKTYPE_RECYCLER => [
+        (string)\TYPO3\CMS\Core\Domain\Repository\PageRepository::DOKTYPE_RECYCLER => [
             'showitem' => '
                 --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
                     --palette--;;standard,

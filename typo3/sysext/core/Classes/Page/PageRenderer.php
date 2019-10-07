@@ -16,17 +16,16 @@ namespace TYPO3\CMS\Core\Page;
 
 use TYPO3\CMS\Backend\Routing\Router;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
-use TYPO3\CMS\Backend\Template\DocumentTemplate;
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Localization\Locales;
 use TYPO3\CMS\Core\Localization\LocalizationFactory;
 use TYPO3\CMS\Core\MetaTag\MetaTagManagerRegistry;
+use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\Resource\ResourceCompressor;
 use TYPO3\CMS\Core\Service\MarkerBasedTemplateService;
 use TYPO3\CMS\Core\SingletonInterface;
-use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
 
@@ -1020,11 +1019,8 @@ class PageRenderer implements SingletonInterface
      * @param bool $defer Flag if property 'defer="defer"' should be added to JavaScript tags
      * @param string $crossorigin CORS settings attribute
      */
-    public function addJsLibrary($name, $file, $type = 'text/javascript', $compress = false, $forceOnTop = false, $allWrap = '', $excludeFromConcatenation = false, $splitChar = '|', $async = false, $integrity = '', $defer = false, $crossorigin = '')
+    public function addJsLibrary($name, $file, $type = '', $compress = false, $forceOnTop = false, $allWrap = '', $excludeFromConcatenation = false, $splitChar = '|', $async = false, $integrity = '', $defer = false, $crossorigin = '')
     {
-        if (!$type) {
-            $type = 'text/javascript';
-        }
         if (!in_array(strtolower($name), $this->jsLibs)) {
             $this->jsLibs[strtolower($name)] = [
                 'file' => $file,
@@ -1059,11 +1055,8 @@ class PageRenderer implements SingletonInterface
      * @param bool $defer Flag if property 'defer="defer"' should be added to JavaScript tags
      * @param string $crossorigin CORS settings attribute
      */
-    public function addJsFooterLibrary($name, $file, $type = 'text/javascript', $compress = false, $forceOnTop = false, $allWrap = '', $excludeFromConcatenation = false, $splitChar = '|', $async = false, $integrity = '', $defer = false, $crossorigin = '')
+    public function addJsFooterLibrary($name, $file, $type = '', $compress = false, $forceOnTop = false, $allWrap = '', $excludeFromConcatenation = false, $splitChar = '|', $async = false, $integrity = '', $defer = false, $crossorigin = '')
     {
-        if (!$type) {
-            $type = 'text/javascript';
-        }
         $name .= '_jsFooterLibrary';
         if (!in_array(strtolower($name), $this->jsLibs)) {
             $this->jsLibs[strtolower($name)] = [
@@ -1098,11 +1091,8 @@ class PageRenderer implements SingletonInterface
      * @param bool $defer Flag if property 'defer="defer"' should be added to JavaScript tags
      * @param string $crossorigin CORS settings attribute
      */
-    public function addJsFile($file, $type = 'text/javascript', $compress = true, $forceOnTop = false, $allWrap = '', $excludeFromConcatenation = false, $splitChar = '|', $async = false, $integrity = '', $defer = false, $crossorigin = '')
+    public function addJsFile($file, $type = '', $compress = true, $forceOnTop = false, $allWrap = '', $excludeFromConcatenation = false, $splitChar = '|', $async = false, $integrity = '', $defer = false, $crossorigin = '')
     {
-        if (!$type) {
-            $type = 'text/javascript';
-        }
         if (!isset($this->jsFiles[$file])) {
             $this->jsFiles[$file] = [
                 'file' => $file,
@@ -1136,11 +1126,8 @@ class PageRenderer implements SingletonInterface
      * @param bool $defer Flag if property 'defer="defer"' should be added to JavaScript tags
      * @param string $crossorigin CORS settings attribute
      */
-    public function addJsFooterFile($file, $type = 'text/javascript', $compress = true, $forceOnTop = false, $allWrap = '', $excludeFromConcatenation = false, $splitChar = '|', $async = false, $integrity = '', $defer = false, $crossorigin = '')
+    public function addJsFooterFile($file, $type = '', $compress = true, $forceOnTop = false, $allWrap = '', $excludeFromConcatenation = false, $splitChar = '|', $async = false, $integrity = '', $defer = false, $crossorigin = '')
     {
-        if (!$type) {
-            $type = 'text/javascript';
-        }
         if (!isset($this->jsFiles[$file])) {
             $this->jsFiles[$file] = [
                 'file' => $file,
@@ -1295,16 +1282,16 @@ class PageRenderer implements SingletonInterface
             return;
         }
 
-        $loadedExtensions = ExtensionManagementUtility::getLoadedExtensionListArray();
+        $packages = GeneralUtility::makeInstance(PackageManager::class)->getActivePackages();
         $isDevelopment = GeneralUtility::getApplicationContext()->isDevelopment();
-        $cacheIdentifier = 'requireJS_' . md5(implode(',', $loadedExtensions) . ($isDevelopment ? ':dev' : '') . GeneralUtility::getIndpEnv('TYPO3_REQUEST_SCRIPT'));
+        $cacheIdentifier = 'requireJS_' . md5(implode(',', array_keys($packages)) . ($isDevelopment ? ':dev' : '') . GeneralUtility::getIndpEnv('TYPO3_REQUEST_SCRIPT'));
         /** @var FrontendInterface $cache */
         $cache = static::$cache ?? GeneralUtility::makeInstance(CacheManager::class)->getCache('assets');
         $requireJsConfig = $cache->get($cacheIdentifier);
 
         // if we did not get a configuration from the cache, compute and store it in the cache
         if (!isset($requireJsConfig['internal']) || !isset($requireJsConfig['public'])) {
-            $requireJsConfig = $this->computeRequireJsConfig($isDevelopment, $loadedExtensions);
+            $requireJsConfig = $this->computeRequireJsConfig($isDevelopment, $packages);
             $cache->set($cacheIdentifier, $requireJsConfig);
         }
 
@@ -1318,10 +1305,10 @@ class PageRenderer implements SingletonInterface
      * resource folders plus some additional generic configuration.
      *
      * @param bool $isDevelopment
-     * @param array $loadedExtensions
+     * @param array $packages
      * @return array The RequireJS configuration
      */
-    protected function computeRequireJsConfig($isDevelopment, array $loadedExtensions)
+    protected function computeRequireJsConfig($isDevelopment, array $packages)
     {
         // load all paths to map to package names / namespaces
         $requireJsConfig = [
@@ -1330,13 +1317,7 @@ class PageRenderer implements SingletonInterface
             'internalNames' => [],
         ];
 
-        // In order to avoid browser caching of JS files, adding a GET parameter to the files loaded via requireJS
-        if ($isDevelopment) {
-            $requireJsConfig['public']['urlArgs'] = 'bust=' . $GLOBALS['EXEC_TIME'];
-        } else {
-            $requireJsConfig['public']['urlArgs'] = 'bust=' . GeneralUtility::hmac(TYPO3_version . Environment::getProjectPath());
-        }
-        $corePath = ExtensionManagementUtility::extPath('core', 'Resources/Public/JavaScript/Contrib/');
+        $corePath = $packages['core']->getPackagePath() . 'Resources/Public/JavaScript/Contrib/';
         $corePath = PathUtility::getAbsoluteWebPath($corePath);
         // first, load all paths for the namespaces, and configure contrib libs.
         $requireJsConfig['public']['paths'] = [
@@ -1355,18 +1336,20 @@ class PageRenderer implements SingletonInterface
             'jquery/autocomplete' => $corePath . 'jquery.autocomplete',
             'd3' => $corePath . 'd3/d3',
             'Sortable' => $corePath . 'Sortable.min',
+            'broadcastchannel' => $corePath . '/broadcastchannel-polyfill',
         ];
         $requireJsConfig['public']['waitSeconds'] = 30;
         $requireJsConfig['public']['typo3BaseUrl'] = false;
         $publicPackageNames = ['core', 'frontend', 'backend'];
-        foreach ($loadedExtensions as $packageName) {
-            $jsPath = 'EXT:' . $packageName . '/Resources/Public/JavaScript/';
-            $absoluteJsPath = GeneralUtility::getFileAbsFileName($jsPath);
+        $requireJsExtensionVersions = [];
+        foreach ($packages as $packageName => $package) {
+            $absoluteJsPath = $package->getPackagePath() . 'Resources/Public/JavaScript/';
             $fullJsPath = PathUtility::getAbsoluteWebPath($absoluteJsPath);
             $fullJsPath = rtrim($fullJsPath, '/');
             if (!empty($fullJsPath) && file_exists($absoluteJsPath)) {
                 $type = in_array($packageName, $publicPackageNames, true) ? 'public' : 'internal';
                 $requireJsConfig[$type]['paths']['TYPO3/CMS/' . GeneralUtility::underscoredToUpperCamelCase($packageName)] = $fullJsPath;
+                $requireJsExtensionVersions[] = $package->getPackageKey() . ':' . $package->getPackageMetadata()->getVersion();
             }
         }
         // sanitize module names in internal 'paths'
@@ -1382,6 +1365,15 @@ class PageRenderer implements SingletonInterface
             $sanitizedInternalPathModuleNames,
             $internalPathModuleNames
         );
+
+        // Add a GET parameter to the files loaded via requireJS in order to avoid browser caching of JS files
+        if ($isDevelopment) {
+            $requireJsConfig['public']['urlArgs'] = 'bust=' . $GLOBALS['EXEC_TIME'];
+        } else {
+            $requireJsConfig['public']['urlArgs'] = 'bust=' . GeneralUtility::hmac(
+                Environment::getProjectPath() . implode('|', $requireJsExtensionVersions)
+            );
+        }
 
         // check if additional AMD modules need to be loaded if a single AMD module is initialized
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['RequireJS']['postInitializationModules'] ?? false)) {
@@ -1449,14 +1441,14 @@ class PageRenderer implements SingletonInterface
         // directly after that, include the require.js file
         $html .= '<script src="'
             . $this->processJsFile($this->requireJsPath . 'require.js')
-            . '" type="text/javascript"></script>' . LF;
+            . '"></script>' . LF;
 
         if (!empty($requireJsConfig['typo3BaseUrl'])) {
             $html .= '<script src="'
                 . $this->processJsFile(
                     'EXT:core/Resources/Public/JavaScript/requirejs-loader.js'
                 )
-                . '" type="text/javascript"></script>' . LF;
+                . '"></script>' . LF;
         }
 
         return $html;
@@ -1758,7 +1750,7 @@ class PageRenderer implements SingletonInterface
     /**
      * Renders all JavaScript and CSS
      *
-     * @return array<string>
+     * @return array|string[]
      */
     protected function renderJavaScriptAndCss()
     {
@@ -2113,7 +2105,7 @@ class PageRenderer implements SingletonInterface
     /**
      * Render JavaScipt libraries
      *
-     * @return array<string> jsLibs and jsFooterLibs strings
+     * @return array|string[] jsLibs and jsFooterLibs strings
      */
     protected function renderAdditionalJavaScriptLibraries()
     {
@@ -2157,7 +2149,7 @@ class PageRenderer implements SingletonInterface
     /**
      * Render JavaScript files
      *
-     * @return array<string> jsFiles and jsFooterFiles strings
+     * @return array|string[] jsFiles and jsFooterFiles strings
      */
     protected function renderJavaScriptFiles()
     {
@@ -2166,11 +2158,12 @@ class PageRenderer implements SingletonInterface
         if (!empty($this->jsFiles)) {
             foreach ($this->jsFiles as $file => $properties) {
                 $file = $this->getStreamlinedFileName($file);
+                $type = $properties['type'] ? ' type="' . htmlspecialchars($properties['type']) . '"' : '';
                 $async = $properties['async'] ? ' async="async"' : '';
                 $defer = $properties['defer'] ? ' defer="defer"' : '';
                 $integrity = $properties['integrity'] ? ' integrity="' . htmlspecialchars($properties['integrity']) . '"' : '';
                 $crossorigin = $properties['crossorigin'] ? ' crossorigin="' . htmlspecialchars($properties['crossorigin']) . '"' : '';
-                $tag = '<script src="' . htmlspecialchars($file) . '" type="' . htmlspecialchars($properties['type']) . '"' . $async . $defer . $integrity . $crossorigin . '></script>';
+                $tag = '<script src="' . htmlspecialchars($file) . '"' . $type . $async . $defer . $integrity . $crossorigin . '></script>';
                 if ($properties['allWrap']) {
                     $wrapArr = explode($properties['splitChar'] ?: '|', $properties['allWrap'], 2);
                     $tag = $wrapArr[0] . $tag . $wrapArr[1];
@@ -2201,7 +2194,7 @@ class PageRenderer implements SingletonInterface
     /**
      * Render inline JavaScript
      *
-     * @return array<string> jsInline and jsFooterInline string
+     * @return array|string[] jsInline and jsFooterInline string
      */
     protected function renderInlineJavaScript()
     {
@@ -2367,12 +2360,8 @@ class PageRenderer implements SingletonInterface
                 ];
                 GeneralUtility::callUserFunction($GLOBALS['TYPO3_CONF_VARS'][TYPO3_MODE]['cssConcatenateHandler'], $params, $this);
             } else {
-                $cssOptions = [];
-                if (TYPO3_MODE === 'BE') {
-                    $cssOptions = ['baseDirectories' => GeneralUtility::makeInstance(DocumentTemplate::class)->getSkinStylesheetDirectories()];
-                }
-                $this->cssLibs = $this->getCompressor()->concatenateCssFiles($this->cssLibs, $cssOptions);
-                $this->cssFiles = $this->getCompressor()->concatenateCssFiles($this->cssFiles, $cssOptions);
+                $this->cssLibs = $this->getCompressor()->concatenateCssFiles($this->cssLibs);
+                $this->cssFiles = $this->getCompressor()->concatenateCssFiles($this->cssFiles);
             }
         }
     }

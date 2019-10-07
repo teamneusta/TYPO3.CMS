@@ -42,7 +42,7 @@ class LateBootService
     /**
      * @var ContainerInterface
      */
-    private $container = null;
+    private $container;
 
     /**
      * @param ContainerBuilder $containerBuilder
@@ -127,9 +127,9 @@ class LateBootService
         PageRenderer::setCache($assetsCache);
         Bootstrap::loadTypo3LoadedExtAndExtLocalconf(false);
         Bootstrap::unsetReservedGlobalVariables();
+        $container->get('boot.state')->done = true;
         Bootstrap::loadBaseTca(false);
         Bootstrap::loadExtTables(false);
-        $container->get('boot.state')->done = true;
 
         $this->makeCurrent(null, $backup);
 

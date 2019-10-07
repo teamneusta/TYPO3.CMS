@@ -507,7 +507,7 @@ class WorkspaceVersionRecordsCommand extends Command
                 ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
 
             $result = $queryBuilder
-                ->select('uid', 'pid', 't3ver_move_id', 't3ver_wsid', 't3ver_state')
+                ->select('uid', 'pid', 't3ver_move_id', 't3ver_wsid', 't3ver_oid', 't3ver_state')
                 ->from($table)
                 ->where(
                     $queryBuilder->expr()->neq(
@@ -519,7 +519,7 @@ class WorkspaceVersionRecordsCommand extends Command
 
             while ($placeholderRecord = $result->fetch()) {
                 if (VersionState::cast($placeholderRecord['t3ver_state'])->equals(VersionState::MOVE_PLACEHOLDER)) {
-                    if ((int)$placeholderRecord['pid'] === -1) {
+                    if ((int)$placeholderRecord['t3ver_oid'] > 0) {
                         $records[] = $table . ':' . $placeholderRecord['uid'] . ' - Record was offline, must not be!';
                     }
                 } else {

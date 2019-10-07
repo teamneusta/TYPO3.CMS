@@ -10,4 +10,4 @@
  *
  * The TYPO3 project - inspiring people to share!
  */
-define(["require","exports","jquery","./LinkBrowser"],function(n,i,t,e){"use strict";return new function(){t(function(){t("#lmailform").on("submit",function(n){n.preventDefault();var i=t(n.currentTarget).find('[name="lemail"]').val();if("mailto:"!==i){for(;"mailto:"===i.substr(0,7);)i=i.substr(7);e.finalizeFunction("mailto:"+i)}})})}});
+define(["require","exports","jquery","./LinkBrowser"],function(e,r,t,i){"use strict";return new class{constructor(){t(()=>{t("#lmailform").on("submit",e=>{e.preventDefault();let r=t(e.currentTarget).find('[name="lemail"]').val();if("mailto:"!==r){for(;"mailto:"===r.substr(0,7);)r=r.substr(7);i.finalizeFunction("mailto:"+r)}})})}}});

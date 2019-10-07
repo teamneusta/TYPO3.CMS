@@ -18,6 +18,7 @@ use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Database\Platform\PlatformInformation;
 use TYPO3\CMS\Core\Database\Query\QueryHelper;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Database\Query\Restriction\WorkspaceRestriction;
 use TYPO3\CMS\Core\DataHandling\PlainDataResolver;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
@@ -969,15 +970,8 @@ class RelationHandler
         }
         // Select children from the live(!) workspace only
         if (BackendUtility::isTableWorkspaceEnabled($foreign_table)) {
-            $queryBuilder->andWhere(
-                $queryBuilder->expr()->in(
-                    $foreign_table . '.t3ver_wsid',
-                    $queryBuilder->createNamedParameter([0, (int)$this->getWorkspaceId()], Connection::PARAM_INT_ARRAY)
-                ),
-                $queryBuilder->expr()->neq(
-                    $foreign_table . '.pid',
-                    $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
-                )
+            $queryBuilder->getRestrictions()->add(
+                GeneralUtility::makeInstance(WorkspaceRestriction::class, (int)$this->getWorkspaceId())
             );
         }
         // Get the correct sorting field
@@ -1451,6 +1445,7 @@ class RelationHandler
      */
     protected function purgeVersionedIds($tableName, array $ids)
     {
+        $ids = $this->sanitizeIds($ids);
         $ids = array_combine($ids, $ids);
         $connection = $this->getConnectionForTableName($tableName);
         $maxBindParameters = PlatformInformation::getMaxBindParameters($connection->getDatabasePlatform());
@@ -1461,10 +1456,6 @@ class RelationHandler
             $result = $queryBuilder->select('uid', 't3ver_oid', 't3ver_state')
                 ->from($tableName)
                 ->where(
-                    $queryBuilder->expr()->eq(
-                        'pid',
-                        $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
-                    ),
                     $queryBuilder->expr()->in(
                         't3ver_oid',
                         $queryBuilder->createNamedParameter($chunk, Connection::PARAM_INT_ARRAY)
@@ -1497,6 +1488,7 @@ class RelationHandler
      */
     protected function purgeLiveVersionedIds($tableName, array $ids)
     {
+        $ids = $this->sanitizeIds($ids);
         $ids = array_combine($ids, $ids);
         $connection = $this->getConnectionForTableName($tableName);
         $maxBindParameters = PlatformInformation::getMaxBindParameters($connection->getDatabasePlatform());
@@ -1507,10 +1499,6 @@ class RelationHandler
             $result = $queryBuilder->select('uid', 't3ver_oid', 't3ver_state')
                 ->from($tableName)
                 ->where(
-                    $queryBuilder->expr()->eq(
-                        'pid',
-                        $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
-                    ),
                     $queryBuilder->expr()->in(
                         't3ver_oid',
                         $queryBuilder->createNamedParameter($chunk, Connection::PARAM_INT_ARRAY)
@@ -1544,6 +1532,7 @@ class RelationHandler
      */
     protected function purgeDeletePlaceholder($tableName, array $ids)
     {
+        $ids = $this->sanitizeIds($ids);
         $ids = array_combine($ids, $ids);
         $connection = $this->getConnectionForTableName($tableName);
         $maxBindParameters = PlatformInformation::getMaxBindParameters($connection->getDatabasePlatform());
@@ -1554,15 +1543,11 @@ class RelationHandler
             $result = $queryBuilder->select('uid', 't3ver_oid', 't3ver_state')
                 ->from($tableName)
                 ->where(
-                    $queryBuilder->expr()->eq(
-                        'pid',
-                        $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
-                    ),
                     $queryBuilder->expr()->in(
                         't3ver_oid',
                         $queryBuilder->createNamedParameter($chunk, Connection::PARAM_INT_ARRAY)
                     ),
-                    $queryBuilder->expr()->neq(
+                    $queryBuilder->expr()->eq(
                         't3ver_wsid',
                         $queryBuilder->createNamedParameter(
                             $this->getWorkspaceId(),
@@ -1660,6 +1645,17 @@ class RelationHandler
             $liveDefaultId = $id;
         }
         return (int)$liveDefaultId;
+    }
+
+    /**
+     * Removes empty values (null, '0', 0, false).
+     *
+     * @param int[] $ids
+     * @return array
+     */
+    protected function sanitizeIds(array $ids): array
+    {
+        return array_filter($ids);
     }
 
     /**

@@ -120,12 +120,11 @@ class GeneralUtility
      *
      *************************/
     /**
-     * Returns the 'GLOBAL' value of incoming data from POST or GET, with priority to POST (that is equalent to 'GP' order)
-     * To enhance security in your scripts, please consider using GeneralUtility::_GET or GeneralUtility::_POST if you already
-     * know by which method your data is arriving to the scripts!
+     * Returns the 'GLOBAL' value of incoming data from POST or GET, with priority to POST, which is equalent to 'GP' order
+     * In case you already know by which method your data is arriving consider using GeneralUtility::_GET or GeneralUtility::_POST.
      *
      * @param string $var GET/POST var to return
-     * @return mixed POST var named $var and if not set, the GET var of the same name.
+     * @return mixed POST var named $var, if not set, the GET var of the same name and if also not set, NULL.
      */
     public static function _GP($var)
     {
@@ -163,12 +162,12 @@ class GeneralUtility
 
     /**
      * Returns the global $_GET array (or value from) normalized to contain un-escaped values.
-     * ALWAYS use this API function to acquire the GET variables!
      * This function was previously used to normalize between magic quotes logic, which was removed from PHP 5.5
      *
      * @param string $var Optional pointer to value in GET array (basically name of GET var)
-     * @return mixed If $var is set it returns the value of $_GET[$var]. If $var is NULL (default), returns $_GET itself. In any case *slashes are stipped from the output!*
-     * @see _POST(), _GP()
+     * @return mixed If $var is set it returns the value of $_GET[$var]. If $var is NULL (default), returns $_GET itself.
+     * @see _POST()
+     * @see _GP()
      */
     public static function _GET($var = null)
     {
@@ -184,11 +183,11 @@ class GeneralUtility
 
     /**
      * Returns the global $_POST array (or value from) normalized to contain un-escaped values.
-     * ALWAYS use this API function to acquire the $_POST variables!
      *
      * @param string $var Optional pointer to value in POST array (basically name of POST var)
-     * @return mixed If $var is set it returns the value of $_POST[$var]. If $var is NULL (default), returns $_POST itself. In any case *slashes are stipped from the output!*
-     * @see _GET(), _GP()
+     * @return mixed If $var is set it returns the value of $_POST[$var]. If $var is NULL (default), returns $_POST itself.
+     * @see _GET()
+     * @see _GP()
      */
     public static function _POST($var = null)
     {
@@ -827,7 +826,8 @@ class GeneralUtility
      * @param string $string Input string, eg "123 + 456 / 789 - 4
      * @param string $operators Operators to split by, typically "/+-*
      * @return array Array with operators and operands separated.
-     * @see \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::calc(), \TYPO3\CMS\Frontend\Imaging\GifBuilder::calcOffset()
+     * @see \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::calc()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder::calcOffset()
      */
     public static function splitCalc($string, $operators)
     {
@@ -1324,7 +1324,7 @@ class GeneralUtility
             if (preg_match('/^(\\t+)/', $string, $match)) {
                 $string = str_replace($match[1], "\t", $string);
             }
-            return '<script type="text/javascript">
+            return '<script>
 /*<![CDATA[*/
 ' . $string . '
 /*]]>*/
@@ -1539,7 +1539,8 @@ class GeneralUtility
      * @param string $NSprefix The tag-prefix resolve, eg. a namespace like "T3:"
      * @param bool $reportDocTag If set, the document tag will be set in the key "_DOCUMENT_TAG" of the output array
      * @return mixed If the parsing had errors, a string with the error message is returned. Otherwise an array with the content.
-     * @see array2xml(),xml2arrayProcess()
+     * @see array2xml()
+     * @see xml2arrayProcess()
      */
     public static function xml2array($string, $NSprefix = '', $reportDocTag = false)
     {
@@ -2037,7 +2038,7 @@ class GeneralUtility
      * and group ownership according to $GLOBALS['TYPO3_CONF_VARS']['SYS']['createGroup']
      *
      * @param string $newFolder Absolute path to folder, see PHP mkdir() function. Removes trailing slash internally.
-     * @return bool TRUE if @mkdir went well!
+     * @return bool TRUE if operation was successful
      */
     public static function mkdir($newFolder)
     {
@@ -2107,7 +2108,7 @@ class GeneralUtility
      *
      * @param string $path Absolute path to folder, see PHP rmdir() function. Removes trailing slash internally.
      * @param bool $removeNonEmpty Allow deletion of non-empty directories
-     * @return bool TRUE if @rmdir went well!
+     * @return bool TRUE if operation was successful
      */
     public static function rmdir($path, $removeNonEmpty = false)
     {
@@ -2118,14 +2119,24 @@ class GeneralUtility
         if (file_exists($path)) {
             $OK = true;
             if (!is_link($path) && is_dir($path)) {
-                if ($removeNonEmpty == true && ($handle = @opendir($path))) {
-                    while ($OK && false !== ($file = readdir($handle))) {
+                if ($removeNonEmpty === true && ($handle = @opendir($path))) {
+                    $entries = [];
+
+                    while (false !== ($file = readdir($handle))) {
                         if ($file === '.' || $file === '..') {
                             continue;
                         }
-                        $OK = static::rmdir($path . '/' . $file, $removeNonEmpty);
+
+                        $entries[] = $path . '/' . $file;
                     }
+
                     closedir($handle);
+
+                    foreach ($entries as $entry) {
+                        if (!static::rmdir($entry, $removeNonEmpty)) {
+                            $OK = false;
+                        }
+                    }
                 }
                 if ($OK) {
                     $OK = @rmdir($path);
@@ -3006,7 +3017,7 @@ class GeneralUtility
         } elseif (!(
             static::isFirstPartOfStr($filename, Environment::getProjectPath())
                   || static::isFirstPartOfStr($filename, Environment::getPublicPath())
-                )) {
+        )) {
             // absolute, but set to blank if not allowed
             $filename = '';
         }
@@ -3059,7 +3070,7 @@ class GeneralUtility
                 static::isFirstPartOfStr($path, Environment::getProjectPath())
                 || static::isFirstPartOfStr($path, Environment::getPublicPath())
                 || $lockRootPath && static::isFirstPartOfStr($path, $lockRootPath)
-               );
+            );
     }
 
     /**
@@ -3191,7 +3202,8 @@ class GeneralUtility
      *
      * @param string $uploadedFileName The temporary uploaded filename, eg. $_FILES['[upload field name here]']['tmp_name']
      * @return string If a new file was successfully created, return its filename, otherwise blank string.
-     * @see unlink_tempfile(), upload_copy_move()
+     * @see unlink_tempfile()
+     * @see upload_copy_move()
      */
     public static function upload_to_tempfile($uploadedFileName)
     {
@@ -3217,7 +3229,8 @@ class GeneralUtility
      *
      * @param string $uploadedTempFileName absolute file path - must reside within var/ or typo3temp/ folder.
      * @return bool Returns TRUE if the file was unlink()'ed
-     * @see upload_to_tempfile(), tempnam()
+     * @see upload_to_tempfile()
+     * @see tempnam()
      */
     public static function unlink_tempfile($uploadedTempFileName)
     {
@@ -3246,7 +3259,8 @@ class GeneralUtility
      * @param string $filePrefix Prefix for temporary file
      * @param string $fileSuffix Suffix for temporary file, for example a special file extension
      * @return string result from PHP function tempnam() with the temp/var folder prefixed.
-     * @see unlink_tempfile(), upload_to_tempfile()
+     * @see unlink_tempfile()
+     * @see upload_to_tempfile()
      */
     public static function tempnam($filePrefix, $fileSuffix = '')
     {
@@ -3400,7 +3414,7 @@ class GeneralUtility
      * the instance of a specific class.
      *
      * @param string $className name of the class to instantiate, must not be empty and not start with a backslash
-     * @param array<int, mixed> $constructorArguments Arguments for the constructor
+     * @param array|mixed[] $constructorArguments Arguments for the constructor
      * @return object the created instance
      * @throws \InvalidArgumentException if $className is empty or starts with a backslash
      */
@@ -3461,7 +3475,7 @@ class GeneralUtility
      * container.
      *
      * @param string $className name of the class to instantiate
-     * @param array<int, mixed> $constructorArguments Arguments for the constructor
+     * @param array|mixed[] $constructorArguments Arguments for the constructor
      * @return object the created instance
      * @internal
      */
@@ -3700,6 +3714,7 @@ class GeneralUtility
      * @param string $serviceType Type of service (service key).
      * @param string $serviceSubType Sub type like file extensions or similar. Defined by the service.
      * @param mixed $excludeServiceKeys List of service keys which should be excluded in the search for a service. Array or comma list.
+     * @throws \RuntimeException
      * @return object|string[] The service object or an array with error infos.
      */
     public static function makeInstanceService($serviceType, $serviceSubType = '', $excludeServiceKeys = [])
@@ -3719,8 +3734,8 @@ class GeneralUtility
             $obj = self::makeInstance($info['className']);
             if (is_object($obj)) {
                 if (!@is_callable([$obj, 'init'])) {
-                    // use silent logging??? I don't think so.
-                    die('Broken service:' . DebugUtility::viewArray($info));
+                    self::getLogger()->error('Requested service ' . $info['className'] . ' has no init() method.', ['service' => $info]);
+                    throw new \RuntimeException('Broken service: ' . $info['className'], 1568119209);
                 }
                 $obj->info = $info;
                 // service available?

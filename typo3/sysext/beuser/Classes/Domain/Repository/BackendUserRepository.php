@@ -34,7 +34,7 @@ class BackendUserRepository extends BackendUserGroupRepository
      * Finds Backend Users on a given list of uids
      *
      * @param array $uidList
-     * @return \TYPO3\CMS\Extbase\Persistence\Generic\QueryResult<\TYPO3\CMS\Beuser\Domain\Model\BackendUser>
+     * @return \TYPO3\CMS\Extbase\Persistence\Generic\QueryResult
      */
     public function findByUidList(array $uidList)
     {
@@ -49,7 +49,7 @@ class BackendUserRepository extends BackendUserGroupRepository
      * Find Backend Users matching to Demand object properties
      *
      * @param Demand $demand
-     * @return \TYPO3\CMS\Extbase\Persistence\Generic\QueryResult<\TYPO3\CMS\Beuser\Domain\Model\BackendUser>
+     * @return \TYPO3\CMS\Extbase\Persistence\Generic\QueryResult
      */
     public function findDemanded(Demand $demand)
     {
@@ -98,12 +98,11 @@ class BackendUserRepository extends BackendUserGroupRepository
         // @TODO: Refactor for real n:m relations
         if ($demand->getBackendUserGroup()) {
             $constraints[] = $query->logicalOr([
-                $query->equals('usergroup', (int)$demand->getBackendUserGroup()->getUid()),
-                $query->like('usergroup', (int)$demand->getBackendUserGroup()->getUid() . ',%'),
-                $query->like('usergroup', '%,' . (int)$demand->getBackendUserGroup()->getUid()),
-                $query->like('usergroup', '%,' . (int)$demand->getBackendUserGroup()->getUid() . ',%')
+                $query->equals('usergroup', (int)$demand->getBackendUserGroup()),
+                $query->like('usergroup', (int)$demand->getBackendUserGroup() . ',%'),
+                $query->like('usergroup', '%,' . (int)$demand->getBackendUserGroup()),
+                $query->like('usergroup', '%,' . (int)$demand->getBackendUserGroup() . ',%')
             ]);
-            $query->contains('usergroup', $demand->getBackendUserGroup());
         }
         $query->matching($query->logicalAnd($constraints));
         /** @var QueryResult $result */
@@ -114,7 +113,7 @@ class BackendUserRepository extends BackendUserGroupRepository
     /**
      * Find Backend Users currently online
      *
-     * @return \TYPO3\CMS\Extbase\Persistence\Generic\QueryResult<\TYPO3\CMS\Beuser\Domain\Model\BackendUser>
+     * @return \TYPO3\CMS\Extbase\Persistence\Generic\QueryResult
      */
     public function findOnline()
     {

@@ -14,6 +14,8 @@ namespace TYPO3\CMS\Filelist\Controller;
  * The TYPO3 project - inspiring people to share!
  */
 
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Backend\Clipboard\Clipboard;
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -43,8 +45,13 @@ use TYPO3\CMS\Filelist\FileList;
  * Script Class for creating the list of files in the File > Filelist module
  * @internal this is a concrete TYPO3 controller implementation and solely used for EXT:filelist and not part of TYPO3's Core API.
  */
-class FileListController extends ActionController
+class FileListController extends ActionController implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+
+    public const UPLOAD_ACTION_REPLACE = 'replace';
+    public const UPLOAD_ACTION_RENAME = 'rename';
+    public const UPLOAD_ACTION_SKIP = 'cancel';
 
     /**
      * @var array
@@ -287,8 +294,6 @@ class FileListController extends ActionController
         $this->registerDocHeaderButtons();
     }
 
-    /**
-     */
     protected function initializeIndexAction()
     {
         // Apply predefined values for hidden checkboxes
@@ -323,8 +328,6 @@ class FileListController extends ActionController
         }
     }
 
-    /**
-     */
     protected function indexAction()
     {
         $pageRenderer = $this->view->getModuleTemplate()->getPageRenderer();
@@ -387,10 +390,6 @@ class FileListController extends ActionController
             $this->view->getModuleTemplate()->addJavaScriptCode(
                 'FileListIndex',
                 'if (top.fsMod) top.fsMod.recentIds["file"] = "' . rawurlencode($this->id) . '";' . $this->filelist->CBfunctions() . '
-                function jumpToUrl(URL) {
-                    window.location.href = URL;
-                    return false;
-                }
                 '
             );
             $pageRenderer->loadRequireJsModule('TYPO3/CMS/Filelist/FileDelete');
@@ -463,13 +462,35 @@ class FileListController extends ActionController
             $this->view->assign('folderIdentifier', $this->folderObject->getCombinedIdentifier());
             $this->view->assign('fileDenyPattern', $GLOBALS['TYPO3_CONF_VARS']['BE']['fileDenyPattern']);
             $this->view->assign('maxFileSize', GeneralUtility::getMaxUploadFileSize() * 1024);
+            $this->view->assign('defaultAction', $this->getDefaultAction());
         } else {
             $this->forward('missingFolder');
         }
     }
 
-    /**
-     */
+    protected function getDefaultAction(): string
+    {
+        $defaultAction = $this->getBackendUser()->getTSConfig()
+            ['options.']['file_list.']['uploader.']['defaultAction'] ?? '';
+
+        if ($defaultAction === '') {
+            $defaultAction = self::UPLOAD_ACTION_SKIP;
+        }
+        if (!in_array($defaultAction, [
+            self::UPLOAD_ACTION_REPLACE,
+            self::UPLOAD_ACTION_RENAME,
+            self::UPLOAD_ACTION_SKIP
+        ], true)) {
+            $this->logger->warning(sprintf(
+                'TSConfig: options.file_list.uploader.defaultAction contains an invalid value ("%s"), fallback to default value: "%s"',
+                $defaultAction,
+                self::UPLOAD_ACTION_SKIP
+            ));
+            $defaultAction = self::UPLOAD_ACTION_SKIP;
+        }
+        return $defaultAction;
+    }
+
     protected function missingFolderAction()
     {
         if ($this->errorMessage) {

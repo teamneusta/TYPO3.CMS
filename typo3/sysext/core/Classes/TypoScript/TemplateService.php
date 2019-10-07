@@ -15,19 +15,22 @@ namespace TYPO3\CMS\Core\TypoScript;
  */
 
 use TYPO3\CMS\Core\Cache\CacheManager;
+use TYPO3\CMS\Core\Compatibility\PublicPropertyDeprecationTrait;
 use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Core\Context\TypoScriptAspect;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\AbstractRestrictionContainer;
 use TYPO3\CMS\Core\Database\Query\Restriction\DefaultRestrictionContainer;
 use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\TimeTracker\TimeTracker;
+use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Frontend\Configuration\TypoScript\ConditionMatching\ConditionMatcher;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * Template object that is responsible for generating the TypoScript template based on template records.
@@ -36,6 +39,12 @@ use TYPO3\CMS\Frontend\Page\PageRepository;
  */
 class TemplateService
 {
+    use PublicPropertyDeprecationTrait;
+
+    private $deprecatedPublicProperties = [
+        'forceTemplateParsing' => 'Using tmpl->forceTemplateParsing is deprecated and will no longer work with TYPO3 v11.0. Use TypoScriptAspect from Context instead.'
+    ];
+
     /**
      * option to enable logging, time-tracking (FE-only)
      * usually, this is only done when
@@ -56,8 +65,9 @@ class TemplateService
      * If set, the template is always rendered. Used from Admin Panel.
      *
      * @var bool
+     * @deprecated
      */
-    public $forceTemplateParsing = false;
+    private $forceTemplateParsing = false;
 
     /**
      * This array is passed on to matchObj by generateConfig().
@@ -284,13 +294,20 @@ class TemplateService
     protected $packageManager;
 
     /**
+     * @var TypoScriptFrontendController|null
+     */
+    protected $frontendController;
+
+    /**
      * @param Context|null $context
      * @param PackageManager|null $packageManager
+     * @param TypoScriptFrontendController|null $frontendController
      */
-    public function __construct(Context $context = null, PackageManager $packageManager = null)
+    public function __construct(Context $context = null, PackageManager $packageManager = null, TypoScriptFrontendController $frontendController = null)
     {
         $this->context = $context ?? GeneralUtility::makeInstance(Context::class);
         $this->packageManager = $packageManager ?? GeneralUtility::makeInstance(PackageManager::class);
+        $this->frontendController = $frontendController;
         $this->initializeDatabaseQueryRestrictions();
         if ($this->context->getPropertyFromAspect('visibility', 'includeHiddenContent', false) || $GLOBALS['SIM_ACCESS_TIME'] !== $GLOBALS['ACCESS_TIME']) {
             // Set the simulation flag, if simulation is detected!
@@ -391,6 +408,10 @@ class TemplateService
      */
     public function start($theRootLine)
     {
+        // @deprecated - can be removed with TYPO3 v11.0
+        if ((bool)$this->forceTemplateParsing) {
+            $this->context->setAspect('typoscript', GeneralUtility::makeInstance(TypoScriptAspect::class, true));
+        }
         if (is_array($theRootLine)) {
             $constantsData = [];
             $setupData = [];
@@ -446,7 +467,7 @@ class TemplateService
                     $setupData = $cachedData['setup'];
                 }
             }
-            if (!empty($setupData) && !$this->forceTemplateParsing) {
+            if (!empty($setupData) && !$this->context->getPropertyFromAspect('typoscript', 'forcedTemplateParsing')) {
                 // TypoScript constants + setup are found in the cache
                 $this->setup_constants = $constantsData;
                 $this->setup = $setupData;
@@ -896,7 +917,8 @@ class TemplateService
      *
      * @param array $subrow Static template record/file
      * @return array Returns the input array where the values for keys "config" and "constants" may have been modified with prepended code.
-     * @see addExtensionStatics(), includeStaticTypoScriptSources()
+     * @see addExtensionStatics()
+     * @see includeStaticTypoScriptSources()
      */
     protected function prependStaticExtra($subrow)
     {
@@ -934,7 +956,8 @@ class TemplateService
      * Generates the configuration array by replacing constants and parsing the whole thing.
      * Depends on $this->config and $this->constants to be set prior to this! (done by processTemplate/runThroughTemplates)
      *
-     * @see \TYPO3\CMS\Core\TypoScript\Parser\TypoScriptParser, start()
+     * @see \TYPO3\CMS\Core\TypoScript\Parser\TypoScriptParser
+     * @see start()
      */
     public function generateConfig()
     {
@@ -963,8 +986,7 @@ class TemplateService
         // Read out parse errors if any
         $this->parserErrors['constants'] = $constants->errors;
         // Then flatten the structure from a multi-dim array to a single dim array with all constants listed as key/value pairs (ready for substitution)
-        $this->flatSetup = [];
-        $this->flattenSetup($constants->setup, '');
+        $this->flatSetup = ArrayUtility::flatten($constants->setup, '', true);
         // ***********************************************
         // Parse TypoScript Setup (here called "config")
         // ***********************************************
@@ -1051,7 +1073,8 @@ class TemplateService
      * for include instructions and does the inclusion of external TypoScript files
      * if needed.
      *
-     * @see \TYPO3\CMS\Core\TypoScript\Parser\TypoScriptParser, generateConfig()
+     * @see \TYPO3\CMS\Core\TypoScript\Parser\TypoScriptParser
+     * @see generateConfig()
      */
     protected function processIncludes()
     {
@@ -1086,31 +1109,11 @@ class TemplateService
     }
 
     /**
-     * This flattens a hierarchical TypoScript array to $this->flatSetup
-     *
-     * @param array $setupArray TypoScript array
-     * @param string $prefix Prefix to the object path. Used for recursive calls to this function.
-     * @see generateConfig()
-     */
-    protected function flattenSetup($setupArray, $prefix)
-    {
-        if (is_array($setupArray)) {
-            foreach ($setupArray as $key => $val) {
-                if (is_array($val)) {
-                    $this->flattenSetup($val, $prefix . $key);
-                } else {
-                    $this->flatSetup[$prefix . $key] = $val;
-                }
-            }
-        }
-    }
-
-    /**
      * Substitutes the constants from $this->flatSetup in the text string $all
      *
      * @param string $all TypoScript code text string
      * @return string The processed string with all constants found in $this->flatSetup as key/value pairs substituted.
-     * @see generateConfig(), flattenSetup()
+     * @see generateConfig()
      */
     protected function substituteConstants($all)
     {
@@ -1226,7 +1229,7 @@ class TemplateService
      */
     protected function getTypoScriptFrontendController()
     {
-        return $GLOBALS['TSFE'];
+        return $this->frontendController ?? $GLOBALS['TSFE'];
     }
 
     /**

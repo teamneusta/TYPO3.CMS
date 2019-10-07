@@ -22,6 +22,7 @@ use TYPO3\CMS\Core\Registry;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
+use TYPO3\CMS\Core\Utility\VersionNumberUtility;
 
 /**
  * Provide information about documentation files
@@ -75,10 +76,14 @@ class DocumentationFile
             throw new \InvalidArgumentException('the given path does not belong to the changelog dir. Aborting', 1537158043);
         }
 
+        $currentVersion = (int)explode('.', VersionNumberUtility::getNumericTypo3Version())[0];
+        $versions = range($currentVersion, $currentVersion - 2);
+        $pattern = '(master|' . implode('\.*|', $versions) . '\.*)';
         $finder = new Finder();
         $finder
             ->depth(0)
-            ->sortByName()
+            ->sortByName(true)
+            ->name($pattern)
             ->in($path);
 
         $directories = [];
@@ -319,8 +324,8 @@ class DocumentationFile
     protected function parseContent(string $rstContent): string
     {
         $content = htmlspecialchars($rstContent);
-        $content = preg_replace('/:issue:`([\d]*)`/', '<a href="https://forge.typo3.org/issues/\\1" target="_blank">\\1</a>', $content);
-        $content = preg_replace('/#([\d]*)/', '#<a href="https://forge.typo3.org/issues/\\1" target="_blank">\\1</a>', $content);
+        $content = preg_replace('/:issue:`([\d]*)`/', '<a href="https://forge.typo3.org/issues/\\1" target="_blank" rel="noopener noreferrer">\\1</a>', $content);
+        $content = preg_replace('/#([\d]*)/', '#<a href="https://forge.typo3.org/issues/\\1" target="_blank" rel="noopener noreferrer">\\1</a>', $content);
         $content = preg_replace('/(\n([=]*)\n(.*)\n([=]*)\n)/', '', $content, 1);
         $content = preg_replace('/.. index::(.*)/', '', $content);
         $content = preg_replace('/.. include::(.*)/', '', $content);

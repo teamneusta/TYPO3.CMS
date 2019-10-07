@@ -20,7 +20,7 @@ define(['jquery',
     'TYPO3/CMS/Backend/PageTree/PageTreeDragDrop',
     'TYPO3/CMS/Backend/Tooltip',
     'TYPO3/CMS/Backend/SvgTree',
-    'TYPO3/CMS/Backend/jquery.clearable'
+    'TYPO3/CMS/Backend/Input/Clearable'
   ],
   function($, Icons, d3, PageTreeDragDrop) {
     'use strict';
@@ -66,6 +66,13 @@ define(['jquery',
        * @type {jQuery}
        */
       this.template = null;
+
+      /**
+       * Nodes stored encoded before tree gets filtered
+       *
+       * @type {string}
+       */
+      this.originalNodes = '';
     };
 
     /**
@@ -167,11 +174,15 @@ define(['jquery',
 
           $toolbar.find('[data-tree-submenu]').not($submenu).removeClass('active');
           $submenu.addClass('active');
-          $submenu.find('input').clearable({
-            onClear: function(){
-              $submenu.find('input').trigger('input');
-            }
-          });
+
+          let input = $submenu.find('input').get(0);
+          if (input) {
+            input.clearable({
+              onClear: function (input) {
+                $(input).trigger('input');
+              }
+            });
+          }
           $submenu.find('input').focus();
         });
       });
@@ -219,18 +230,27 @@ define(['jquery',
       var _this = this;
       var name = $(input).val().trim();
 
-      this.tree.nodes[0].expanded = false;
-      this.tree.nodes.forEach(function(node) {
-        var regex = new RegExp(name, 'i');
-        if (node.identifier.toString() === name || regex.test(node.name) || regex.test(node.alias)) {
-          _this.showParents(node);
-          node.expanded = true;
-          node.hidden = false;
-        } else if (node.depth !== 0) {
-          node.hidden = true;
-          node.expanded = false;
+      if (name !== '') {
+        if (this.originalNodes.length === 0) {
+          this.originalNodes = JSON.stringify(this.tree.nodes);
         }
-      });
+
+        this.tree.nodes[0].expanded = false;
+        this.tree.nodes.forEach(function (node) {
+          var regex = new RegExp(name, 'i');
+          if (node.identifier.toString() === name || regex.test(node.name) || regex.test(node.alias || '')) {
+            _this.showParents(node);
+            node.expanded = true;
+            node.hidden = false;
+          } else if (node.depth !== 0) {
+            node.hidden = true;
+            node.expanded = false;
+          }
+        });
+      } else {
+        this.tree.nodes = JSON.parse(this.originalNodes);
+        this.originalNodes = '';
+      }
 
       this.tree.prepareDataForVisibleNodes();
       this.tree.update();

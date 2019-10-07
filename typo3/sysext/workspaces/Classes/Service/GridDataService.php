@@ -159,6 +159,7 @@ class GridDataService implements LoggerAwareInterface
                     }
 
                     $isDeletedPage = $table === 'pages' && $recordState === 'deleted';
+                    $pageId = $table === 'pages' ? $record['uid'] : $record['pid'];
                     $viewUrl = GeneralUtility::makeInstance(PreviewUriBuilder::class)->buildUriForElement($table, $record['uid'], $origRecord, $versionRecord);
                     $versionArray = [];
                     $versionArray['table'] = $table;
@@ -188,7 +189,7 @@ class GridDataService implements LoggerAwareInterface
                     $languageValue = $this->getLanguageValue($table, $versionRecord);
                     $versionArray['languageValue'] = $languageValue;
                     $versionArray['language'] = [
-                        'icon' => $iconFactory->getIcon($this->getSystemLanguageValue($languageValue, 'flagIcon'), Icon::SIZE_SMALL)->render()
+                        'icon' => $iconFactory->getIcon($this->getSystemLanguageValue($languageValue, $pageId, 'flagIcon'), Icon::SIZE_SMALL)->render()
                     ];
                     $versionArray['allowedAction_nextStage'] = $isRecordTypeAllowedToModify && $stagesObj->isNextStageAllowedForUser($versionRecord['t3ver_stage']);
                     $versionArray['allowedAction_prevStage'] = $isRecordTypeAllowedToModify && $stagesObj->isPrevStageAllowedForUser($versionRecord['t3ver_stage']);
@@ -498,12 +499,12 @@ class GridDataService implements LoggerAwareInterface
                             }
                             break;
                         case 'change':
-                            if (stripos(strval($versionArray[$column]), str_replace('%', '', $filterText)) !== false) {
+                            if (stripos((string)$versionArray[$column], str_replace('%', '', $filterText)) !== false) {
                                 return true;
                             }
                             break;
                         default:
-                            if (stripos(strval($versionArray[$column]), $filterText) !== false) {
+                            if (stripos((string)$versionArray[$column], $filterText) !== false) {
                                 return true;
                             }
                     }
@@ -587,14 +588,15 @@ class GridDataService implements LoggerAwareInterface
      * Gets a named value of the available sys_language elements.
      *
      * @param int $id sys_language uid
+     * @param int $pageId page id of a site
      * @param string $key Name of the value to be fetched (e.g. title)
      * @return string|null
      * @see getSystemLanguages
      */
-    protected function getSystemLanguageValue($id, $key)
+    protected function getSystemLanguageValue($id, $pageId, $key)
     {
         $value = null;
-        $systemLanguages = $this->getSystemLanguages();
+        $systemLanguages = $this->getSystemLanguages($pageId);
         if (!empty($systemLanguages[$id][$key])) {
             $value = $systemLanguages[$id][$key];
         }
@@ -604,13 +606,14 @@ class GridDataService implements LoggerAwareInterface
     /**
      * Gets all available system languages.
      *
+     * @param int $pageId
      * @return array
      */
-    public function getSystemLanguages()
+    public function getSystemLanguages(int $pageId)
     {
         if (!isset($this->systemLanguages)) {
             $translateTools = GeneralUtility::makeInstance(TranslationConfigurationProvider::class);
-            $this->systemLanguages = $translateTools->getSystemLanguages();
+            $this->systemLanguages = $translateTools->getSystemLanguages($pageId);
         }
         return $this->systemLanguages;
     }
@@ -632,7 +635,7 @@ class GridDataService implements LoggerAwareInterface
      * Emits a signal to be handled by any registered slots.
      *
      * @param string $signalName Name of the signal
-     * @param array<int, mixed> $arguments
+     * @param array|mixed[] $arguments
      * @return array
      */
     protected function emitSignal($signalName, ...$arguments)

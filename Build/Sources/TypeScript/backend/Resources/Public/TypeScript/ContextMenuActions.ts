@@ -17,6 +17,7 @@ import InfoWindow = require('./InfoWindow');
 import Modal = require('./Modal');
 import ModuleMenu = require('./ModuleMenu');
 import Viewport = require('./Viewport');
+import Notification = require('TYPO3/CMS/Backend/Notification');
 
 /**
  * @exports TYPO3/CMS/Backend/ContextMenuActions
@@ -50,11 +51,7 @@ class ContextMenuActions {
     );
   }
 
-  /**
-   * @param {string} table
-   * @param {number} uid
-   */
-  public static viewRecord(table: string, uid: number): void {
+  public static viewRecord(): void {
     const $viewUrl = $(this).data('preview-url');
     if ($viewUrl) {
       const previewWin = window.open($viewUrl, 'newTYPO3frontendWindow');
@@ -90,11 +87,7 @@ class ContextMenuActions {
     );
   }
 
-  /**
-   * @param {string} table
-   * @param {number} uid
-   */
-  public static newContentWizard(table: string, uid: number): void {
+  public static newContentWizard(): void {
     const $me = $(this);
     let $wizardUrl = $me.data('new-wizard-url');
     if ($wizardUrl) {
@@ -138,22 +131,14 @@ class ContextMenuActions {
     ModuleMenu.App.showModule('web_list', 'id=' + pageId);
   }
 
-  /**
-   * @param {string} table
-   * @param {number} uid
-   */
-  public static pagesSort(table: string, uid: number): void {
+  public static pagesSort(): void {
     const pagesSortUrl = $(this).data('pages-sort-url');
     if (pagesSortUrl) {
       Viewport.ContentContainer.setUrl(pagesSortUrl);
     }
   }
 
-  /**
-   * @param {string} table
-   * @param {number} uid
-   */
-  public static pagesNewMultiple(table: string, uid: number): void {
+  public static pagesNewMultiple(): void {
     const pagesSortUrl = $(this).data('pages-new-multiple-url');
     if (pagesSortUrl) {
       Viewport.ContentContainer.setUrl(pagesSortUrl);
@@ -182,6 +167,34 @@ class ContextMenuActions {
     Viewport.ContentContainer.setUrl(
       top.TYPO3.settings.RecordCommit.moduleUrl
       + '&data[' + table + '][' + uid + '][hidden]=0'
+      + '&redirect=' + ContextMenuActions.getReturnUrl(),
+    ).done((): void => {
+      Viewport.NavigationContainer.PageTree.refreshTree();
+    });
+  }
+
+  /**
+   * @param {string} table
+   * @param {number} uid
+   */
+  public static showInMenus(table: string, uid: number): void {
+    Viewport.ContentContainer.setUrl(
+      top.TYPO3.settings.RecordCommit.moduleUrl
+      + '&data[' + table + '][' + uid + '][nav_hide]=0'
+      + '&redirect=' + ContextMenuActions.getReturnUrl(),
+    ).done((): void => {
+      Viewport.NavigationContainer.PageTree.refreshTree();
+    });
+  }
+
+  /**
+   * @param {string} table
+   * @param {number} uid
+   */
+  public static hideInMenus(table: string, uid: number): void {
+    Viewport.ContentContainer.setUrl(
+      top.TYPO3.settings.RecordCommit.moduleUrl
+      + '&data[' + table + '][' + uid + '][nav_hide]=1'
       + '&redirect=' + ContextMenuActions.getReturnUrl(),
     ).done((): void => {
       Viewport.NavigationContainer.PageTree.refreshTree();
@@ -221,7 +234,7 @@ class ContextMenuActions {
           success: (): void => {
             if (table === 'pages' && Viewport.NavigationContainer.PageTree) {
               if (uid === top.fsMod.recentIds.web) {
-                let node = Viewport.NavigationContainer.PageTree.instance.nodes[0];
+                let node = Viewport.NavigationContainer.PageTree.getFirstNode();
                 Viewport.NavigationContainer.PageTree.selectNode(node);
               }
 
@@ -279,8 +292,8 @@ class ContextMenuActions {
    * @param {string} iframeUrl
    */
   public static triggerRefresh(iframeUrl: string): void {
-    if (iframeUrl.indexOf('record%2Fedit') === -1) {
-      Viewport.ContentContainer.refresh(true);
+    if (!iframeUrl.includes('record%2Fedit')) {
+      Viewport.ContentContainer.refresh();
     }
   }
 
@@ -291,9 +304,23 @@ class ContextMenuActions {
    * @param {number} uid uid of the page
    */
   public static clearCache(table: string, uid: number): void {
-    const url = top.TYPO3.settings.WebLayout.moduleUrl
-      + '&id=' + uid + '&clear_cache=1';
-    $.ajax(url);
+    $.ajax({
+      url: TYPO3.settings.ajaxUrls.web_list_clearpagecache + '&id=' + uid,
+      cache: false,
+      dataType: 'json',
+      success: (data: any): void => {
+        if (data.success === true) {
+          Notification.success(data.title, data.message, 1);
+        } else {
+          Notification.error(data.title, data.message, 1);
+        }
+      },
+      error: (): void => {
+        Notification.error(
+          'Clearing page caches went wrong on the server side.',
+        );
+      },
+    });
   }
 
   /**

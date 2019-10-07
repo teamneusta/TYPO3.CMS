@@ -107,7 +107,7 @@ HTML;
                             Once you have found a solution to the problem, help others by contributing to the wiki page.
                         </p>
                         <p>
-                            <a href="$wikiLink" target="_blank">Find a solution for this exception in the TYPO3 wiki.</a>
+                            <a href="$wikiLink" target="_blank" rel="noopener noreferrer">Find a solution for this exception in the TYPO3 wiki.</a>
                         </p>
                     </div>
                 </div>
@@ -406,7 +406,7 @@ STYLESHEET;
                     $step['type'],
                     $step['function'],
                     $this->formatArgs($args)
-                    ) . '</div>';
+                ) . '</div>';
             }
 
             if (isset($step['file']) && isset($step['line'])) {

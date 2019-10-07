@@ -25,6 +25,12 @@ use TYPO3\CMS\Felogin\Redirect\RedirectHandler;
 use TYPO3\CMS\Felogin\Redirect\ServerRequestHandler;
 use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
 use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
+use TYPO3\CMS\Core\Context\Exception\AspectNotFoundException;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
+use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
+use TYPO3\CMS\Felogin\Service\TreeUidListProvider;
+use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 
 /**
  * Used for plugin login

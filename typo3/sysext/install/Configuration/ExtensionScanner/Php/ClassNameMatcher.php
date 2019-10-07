@@ -779,6 +779,7 @@ return [
     ],
     'TYPO3\CMS\Saltedpasswords\SaltedPasswordService' => [
         'restFiles' => [
+            'Deprecation-85833-ExtensionSaltedpasswordsMergedIntoCoreExtension.rst',
             'Deprecation-85761-SaltedPasswordService.rst',
             'Breaking-87193-DeprecatedFunctionalityRemoved.rst',
         ],
@@ -880,12 +881,6 @@ return [
         ],
     ],
     'TYPO3\CMS\Saltedpasswords\Utility\ExensionManagerConfigurationUtility' => [
-        'restFiles' => [
-            'Deprecation-85833-ExtensionSaltedpasswordsMergedIntoCoreExtension.rst',
-            'Breaking-87193-DeprecatedFunctionalityRemoved.rst',
-        ],
-    ],
-    'TYPO3\CMS\Saltedpasswords\SaltedPasswordService' => [
         'restFiles' => [
             'Deprecation-85833-ExtensionSaltedpasswordsMergedIntoCoreExtension.rst',
             'Breaking-87193-DeprecatedFunctionalityRemoved.rst',
@@ -1284,6 +1279,57 @@ return [
     'TYPO3\CMS\Lowlevel\Command\RteImagesCommand' => [
         'restFiles' => [
             'Breaking-88500-RTEImageHandlingFunctionalityDropped.rst'
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Page\PageRepository' => [
+        'restFiles' => [
+            'Deprecation-88746-PageRepositoryPHPClassMovedFromFrontendToCoreExtension.rst'
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Page\PageRepositoryGetPageHookInterface' => [
+        'restFiles' => [
+            'Deprecation-88746-PageRepositoryPHPClassMovedFromFrontendToCoreExtension.rst'
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Page\PageRepositoryGetPageOverlayHookInterface' => [
+        'restFiles' => [
+            'Deprecation-88746-PageRepositoryPHPClassMovedFromFrontendToCoreExtension.rst'
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Page\PageRepositoryGetRecordOverlayHookInterface' => [
+        'restFiles' => [
+            'Deprecation-88746-PageRepositoryPHPClassMovedFromFrontendToCoreExtension.rst'
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Page\PageRepositoryInitHookInterface' => [
+        'restFiles' => [
+            'Deprecation-88746-PageRepositoryPHPClassMovedFromFrontendToCoreExtension.rst'
+        ],
+    ],
+    'TYPO3\CMS\Extbase\Configuration\AbstractConfigurationManager' => [
+        'restFiles' => [
+            'Breaking-88496-MethodGetSwitchableControllerActionsHasBeenRemoved.rst'
+        ],
+    ],
+    'TYPO3\CMS\Adminpanel\ModuleApi\InitializableInterface' => [
+        'restFiles' => [
+            'Deprecation-88807-AdminPanelInitializableInterfaceHasBeenDeprecated.rst',
+            'Feature-88807-AdminPanelRequestEnricherInterfaceHasBeenIntroduced.rst',
+        ],
+    ],
+    'TYPO3\CMS\Core\Console\CommandRequestHandler' => [
+        'restFiles' => [
+            'Deprecation-88839-CLILowlevelRequestHandlers.rst',
+        ],
+    ],
+    'TYPO3\CMS\Core\Console\RequestHandlerInterface' => [
+        'restFiles' => [
+            'Deprecation-88839-CLILowlevelRequestHandlers.rst',
+        ],
+    ],
+    'TYPO3\CMS\Core\Localization\Parser\LocallangXmlParser' => [
+        'restFiles' => [
+            'Deprecation-89037-DeprecatedLocallangXmlParser.rst',
         ],
     ],
 ];

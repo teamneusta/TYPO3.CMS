@@ -116,8 +116,8 @@ class SystemEnvironmentBuilder
         }
 
         // This version, branch and copyright
-        define('TYPO3_version', '10.0.0-dev');
-        define('TYPO3_branch', '10.0');
+        define('TYPO3_version', '10.2.0-dev');
+        define('TYPO3_branch', '10.2');
         define('TYPO3_copyright_year', '1998-' . date('Y'));
 
         // TYPO3 external links
@@ -285,7 +285,7 @@ class SystemEnvironmentBuilder
     protected static function getTypo3Os()
     {
         $typoOs = '';
-        if (!stristr(PHP_OS, 'darwin') && !stristr(PHP_OS, 'cygwin') && stristr(PHP_OS, 'win')) {
+        if (stripos(PHP_OS, 'darwin') === false && stripos(PHP_OS, 'cygwin') === false && stripos(PHP_OS, 'win') !== false) {
             $typoOs = 'WIN';
         }
         return $typoOs;

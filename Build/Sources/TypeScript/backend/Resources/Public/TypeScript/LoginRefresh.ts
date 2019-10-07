@@ -21,7 +21,7 @@ enum MarkupIdentifiers {
 }
 
 // hack is required, because the Notification definition is wrong
-declare var Notification: any;
+declare let Notification: any;
 
 /**
  * Module: TYPO3/CMS/Backend/LoginRefresh
@@ -67,7 +67,7 @@ class LoginRefresh {
       return;
     }
     // set interval to 60 seconds
-    let interval: Number = this.intervalTime * 1000;
+    let interval: number = this.intervalTime * 1000;
     this.intervalId = setInterval(this.checkActiveSession, interval);
   }
 
@@ -396,7 +396,7 @@ class LoginRefresh {
       url: $form.attr('action'),
       method: 'POST',
       data: postData,
-      success: (response) => {
+      success: (response: { [key: string ]: any }) => {
         if (response.login.success) {
           // User is logged in
           this.hideLoginForm();
@@ -439,7 +439,7 @@ class LoginRefresh {
    * and opens a dialog.
    */
   protected checkActiveSession = (): void => {
-    $.getJSON(TYPO3.settings.ajaxUrls.login_timedout, [], (response) => {
+    $.getJSON(TYPO3.settings.ajaxUrls.login_timedout, [], (response: { [key: string ]: any }) => {
       if (response.login.locked) {
         if (!this.backendIsLocked) {
           this.backendIsLocked = true;
@@ -479,7 +479,7 @@ try {
   if (top && top.TYPO3 && top.TYPO3.LoginRefresh) {
     loginRefreshObject = top.TYPO3.LoginRefresh;
   }
-} catch (e) {
+} catch {
   // This only happens if the opener, parent or top is some other url (eg a local file)
   // which loaded the current window. Then the browser's cross domain policy jumps in
   // and raises an exception.

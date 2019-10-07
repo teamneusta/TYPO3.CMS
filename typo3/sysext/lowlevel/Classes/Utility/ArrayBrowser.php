@@ -112,7 +112,7 @@ class ArrayBrowser
             $output .= '<span class="list-tree-group">';
             if ($isArray && !$this->expAll) {
                 $goto = 'a' . substr(md5($depth), 0, 6);
-                $output .= '<a class="list-tree-control' . ($isExpanded ? ' list-tree-control-open' : ' list-tree-control-closed') . '" id="' . $goto . '" href="' . htmlspecialchars((string)$uriBuilder->buildUriFromRoutePath(GeneralUtility::_GP('route')) . '&node[' . $depth . ']=' . ($isExpanded ? 0 : 1) . '#' . $goto) . '"><i class="fa"></i></a> ';
+                $output .= '<a class="list-tree-control' . ($isExpanded ? ' list-tree-control-open' : ' list-tree-control-closed') . '" id="' . $goto . '" href="' . htmlspecialchars((string)$uriBuilder->buildUriFromRoutePath(GeneralUtility::_GP('route')) . '&node[' . rawurlencode($depth) . ']=' . ($isExpanded ? 0 : 1) . '#' . $goto) . '"><i class="fa"></i></a> ';
             }
             $output .= $this->wrapArrayKey($key, $depth, !$isArray ? $value : '');
             if (!$isArray) {
@@ -186,8 +186,8 @@ class ArrayBrowser
                 }
             } else {
                 if (
-                    is_scalar($keyArr[$key]) && stristr($keyArr[$key], $searchString)
-                    || $this->searchKeysToo && stristr($key, $searchString)
+                    is_scalar($keyArr[$key]) && stripos($keyArr[$key], $searchString) !== false
+                    || $this->searchKeysToo && stripos($key, $searchString) !== false
                 ) {
                     $this->searchKeys[$depth] = 1;
                 }

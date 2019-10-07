@@ -197,6 +197,7 @@ define(['jquery',
 
         // execute the phpcode from $FormEngine->TBE_EDITOR_fieldChanged_func
         FormEngine.legacyFieldChangedCb();
+        FormEngineValidation.markFieldAsChanged($originalFieldEl);
       }
 
     } else {
@@ -700,9 +701,13 @@ define(['jquery',
    */
   FormEngine.reinitialize = function() {
     // Apply "close" button to all input / datetime fields
-    if ($('.t3js-clearable').length) {
-      require(['TYPO3/CMS/Backend/jquery.clearable'], function() {
-        $('.t3js-clearable').clearable();
+    const clearables = Array.from(document.querySelectorAll('.t3js-clearable')).filter(inputElement => {
+      // Filter input fields being a date time picker and a color picker
+      return !inputElement.classList.contains('t3js-datetimepicker') && !inputElement.classList.contains('t3js-color-picker');
+    });
+    if (clearables.length > 0) {
+      require(['TYPO3/CMS/Backend/Input/Clearable'], function() {
+        clearables.forEach(clearableField => clearableField.clearable());
       });
     }
 
@@ -833,20 +838,34 @@ define(['jquery',
 
   FormEngine.requestConfirmationOnFieldChange = function(fieldName, showConfirmation) {
     const $field = FormEngine.getFieldElement(fieldName);
+
     $field.on('change', function() {
+      const originalValue = $field.data('original-value');
+      let documentUpdated = false;
+
       if (showConfirmation) {
-        const $modal = Modal.confirm(
-          TYPO3.lang['FormEngine.refreshRequiredTitle'],
-          TYPO3.lang['FormEngine.refreshRequiredContent']
-        );
+        if ($field.val() != originalValue) {
+          const $modal = Modal.confirm(
+            TYPO3.lang['FormEngine.refreshRequiredTitle'],
+            TYPO3.lang['FormEngine.refreshRequiredContent']
+          );
 
-        $modal.on('button.clicked', function(e) {
-          if (e.target.name === 'ok') {
-            FormEngine.saveDocument();
-          }
-
-          Modal.dismiss();
-        });
+          $modal.on('button.clicked', function(e) {
+            if (e.target.name === 'ok') {
+              FormEngine.saveDocument();
+              documentUpdated = true
+            }
+            Modal.dismiss();
+          });
+          $modal.on('hide.bs.modal', function(e) {
+            // Revert to previous value if document is not saved.
+            // Trigger js event to update icon in custom select input.
+            if (!documentUpdated && originalValue) {
+              $field.val(originalValue);
+              $field.trigger('change');
+            }
+          });
+        }
       } else {
         FormEngine.saveDocument();
       }
@@ -1167,10 +1186,8 @@ define(['jquery',
    */
   FormEngine.deleteActionCallback = function(modalButtonName, $anchorElement) {
     Modal.dismiss();
-    switch(modalButtonName) {
-      case 'yes':
-        deleteRecord($anchorElement.data('table'), $anchorElement.data('uid'), $anchorElement.data('return-url'));
-        break;
+    if (modalButtonName === 'yes') {
+        FormEngine.invokeRecordDeletion($anchorElement);
     }
   };
 
@@ -1248,6 +1265,10 @@ define(['jquery',
       FormEngine.reinitialize();
       $('#t3js-ui-block').remove();
     });
+  };
+
+  FormEngine.invokeRecordDeletion = function ($anchorElement) {
+    window.location.href = $anchorElement.attr('href');
   };
 
   // load required modules to hook in the post initialize function

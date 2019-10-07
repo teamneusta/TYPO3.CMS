@@ -18,12 +18,12 @@ namespace TYPO3\CMS\Frontend\Tests\Unit\Controller;
 use TYPO3\CMS\Core\Cache\Backend\NullBackend;
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Http\ServerRequestFactory;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\PageTitle\PageTitleProviderManager;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 /**
@@ -493,8 +493,7 @@ class TypoScriptFrontendControllerTest extends UnitTestCase
         $cacheManager->getCache('pages')->willReturn($nullCacheBackend);
         GeneralUtility::setSingletonInstance(CacheManager::class, $cacheManager->reveal());
 
-        $subject = new TypoScriptFrontendController(null, 1, 0);
-        $subject->generatePageTitle();
-        $this->assertSame($pageTitle, $subject->indexedDocTitle);
+        $this->subject->generatePageTitle();
+        $this->assertSame($pageTitle, $this->subject->indexedDocTitle);
     }
 }

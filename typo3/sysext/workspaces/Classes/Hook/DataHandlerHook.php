@@ -63,11 +63,6 @@ class DataHandlerHook
      */
     protected $remappedIds = [];
 
-    /**
-     * @var WorkspaceService
-     */
-    protected $workspaceService;
-
     /****************************
      *****  Cmdmap  Hooks  ******
      ****************************/
@@ -97,50 +92,49 @@ class DataHandlerHook
     public function processCmdmap($command, $table, $id, $value, &$commandIsProcessed, DataHandler $dataHandler)
     {
         // custom command "version"
-        if ($command === 'version') {
-            $commandIsProcessed = true;
-            $action = (string)$value['action'];
-            $comment = !empty($value['comment']) ? $value['comment'] : '';
-            $notificationAlternativeRecipients = isset($value['notificationAlternativeRecipients']) && is_array($value['notificationAlternativeRecipients']) ? $value['notificationAlternativeRecipients'] : [];
-            switch ($action) {
-                case 'new':
-                    $dataHandler->versionizeRecord($table, $id, $value['label']);
-                    break;
-                case 'swap':
-                    $this->version_swap(
+        if ($command !== 'version') {
+            return;
+        }
+        $commandIsProcessed = true;
+        $action = (string)$value['action'];
+        $comment = !empty($value['comment']) ? $value['comment'] : '';
+        $notificationAlternativeRecipients = is_array($value['notificationAlternativeRecipients'] ?? null) ? $value['notificationAlternativeRecipients'] : [];
+        switch ($action) {
+            case 'new':
+                $dataHandler->versionizeRecord($table, $id, $value['label']);
+                break;
+            case 'swap':
+                $this->version_swap(
+                    $table,
+                    $id,
+                    $value['swapWith'],
+                    (bool)$value['swapIntoWS'],
+                    $dataHandler,
+                    $comment,
+                    $notificationAlternativeRecipients
+                );
+                break;
+            case 'clearWSID':
+                $this->version_clearWSID($table, (int)$id, false, $dataHandler);
+                break;
+            case 'flush':
+                $this->version_clearWSID($table, (int)$id, true, $dataHandler);
+                break;
+            case 'setStage':
+                $elementIds = GeneralUtility::trimExplode(',', $id, true);
+                foreach ($elementIds as $elementId) {
+                    $this->version_setStage(
                         $table,
-                        $id,
-                        $value['swapWith'],
-                        (bool)$value['swapIntoWS'],
-                        $dataHandler,
+                        $elementId,
+                        $value['stageId'],
                         $comment,
-                        true,
+                        $dataHandler,
                         $notificationAlternativeRecipients
                     );
-                    break;
-                case 'clearWSID':
-                    $this->version_clearWSID($table, $id, false, $dataHandler);
-                    break;
-                case 'flush':
-                    $this->version_clearWSID($table, $id, true, $dataHandler);
-                    break;
-                case 'setStage':
-                    $elementIds = GeneralUtility::trimExplode(',', $id, true);
-                    foreach ($elementIds as $elementId) {
-                        $this->version_setStage(
-                            $table,
-                            $elementId,
-                            $value['stageId'],
-                            $comment,
-                            true,
-                            $dataHandler,
-                            $notificationAlternativeRecipients
-                        );
-                    }
-                    break;
-                default:
-                    // Do nothing
-            }
+                }
+                break;
+            default:
+                // Do nothing
         }
     }
 
@@ -161,7 +155,7 @@ class DataHandlerHook
         // Reset remapped IDs
         $this->remappedIds = [];
 
-        $this->flushWorkspaceCacheEntriesByWorkspaceId($dataHandler->BE_USER->workspace);
+        $this->flushWorkspaceCacheEntriesByWorkspaceId((int)$dataHandler->BE_USER->workspace);
     }
 
     /**
@@ -183,7 +177,7 @@ class DataHandlerHook
         $recordWasDeleted = true;
         // For Live version, try if there is a workspace version because if so, rather "delete" that instead
         // Look, if record is an offline version, then delete directly:
-        if ($record['pid'] != -1) {
+        if ((int)($record['t3ver_oid'] ?? 0) === 0) {
             if ($wsVersion = BackendUtility::getWorkspaceVersionOfRecord($dataHandler->BE_USER->workspace, $table, $id)) {
                 $record = $wsVersion;
                 $id = $record['uid'];
@@ -191,8 +185,8 @@ class DataHandlerHook
         }
         $recordVersionState = VersionState::cast($record['t3ver_state']);
         // Look, if record is an offline version, then delete directly:
-        if ($record['pid'] == -1) {
-            if ($GLOBALS['TCA'][$table]['ctrl']['versioningWS']) {
+        if ((int)($record['t3ver_oid'] ?? 0) > 0) {
+            if (BackendUtility::isTableWorkspaceEnabled($table)) {
                 // In Live workspace, delete any. In other workspaces there must be match.
                 if ($dataHandler->BE_USER->workspace == 0 || (int)$record['t3ver_wsid'] == $dataHandler->BE_USER->workspace) {
                     $liveRec = BackendUtility::getLiveVersionOfRecord($table, $id, 'uid,t3ver_state');
@@ -234,21 +228,17 @@ class DataHandlerHook
                     } else {
                         // If live record was placeholder (new/deleted), rather clear
                         // it from workspace (because it clears both version and placeholder).
-                        $this->version_clearWSID($table, $id, false, $dataHandler);
+                        $this->version_clearWSID($table, (int)$id, false, $dataHandler);
                     }
                 } else {
                     $dataHandler->newlog('Tried to delete record from another workspace', 1);
                 }
             } else {
-                $dataHandler->newlog('Versioning not enabled for record with PID = -1!', 2);
+                $dataHandler->newlog('Versioning not enabled for record with an online ID (t3ver_oid) given', 2);
             }
-        } elseif ($res = $dataHandler->BE_USER->workspaceAllowLiveRecordsInPID($record['pid'], $table)) {
-            // Look, if record is "online" or in a versionized branch, then delete directly.
-            if ($res > 0) {
-                $dataHandler->deleteEl($table, $id);
-            } else {
-                $dataHandler->newlog('Stage of root point did not allow for deletion', 1);
-            }
+        } elseif ($dataHandler->BE_USER->workspaceAllowsLiveEditingInTable($table)) {
+            // Look, if record is "online" then delete directly.
+            $dataHandler->deleteEl($table, $id);
         } elseif ($recordVersionState->equals(VersionState::MOVE_PLACEHOLDER)) {
             // Placeholders for moving operations are deletable directly.
             // Get record which its a placeholder for and reset the t3ver_state of that:
@@ -298,9 +288,9 @@ class DataHandlerHook
     {
         if ($command === 'delete') {
             if ($table === StagesService::TABLE_STAGE) {
-                $this->resetStageOfElements($id);
+                $this->resetStageOfElements((int)$id);
             } elseif ($table === WorkspaceService::TABLE_WORKSPACE) {
-                $this->flushWorkspaceElements($id);
+                $this->flushWorkspaceElements((int)$id);
             }
         }
     }
@@ -324,6 +314,7 @@ class DataHandlerHook
         if ($dataHandler->BE_USER->workspace === 0) {
             return;
         }
+        $tableSupportsVersioning = BackendUtility::isTableWorkspaceEnabled($table);
         if ($destPid < 0) {
             // Fetch move placeholder, since it might point to a new page in the current workspace
             $movePlaceHolder = BackendUtility::getMovePlaceholder($table, abs($destPid), 'uid,pid');
@@ -334,20 +325,20 @@ class DataHandlerHook
         $recordWasMoved = true;
         $moveRecVersionState = VersionState::cast($moveRec['t3ver_state']);
         // Get workspace version of the source record, if any:
-        $WSversion = BackendUtility::getWorkspaceVersionOfRecord($dataHandler->BE_USER->workspace, $table, $uid, 'uid,t3ver_oid');
+        $workspaceVersion = BackendUtility::getWorkspaceVersionOfRecord($dataHandler->BE_USER->workspace, $table, $uid, 'uid,t3ver_oid');
         // Handle move-placeholders if the current record is not one already
         if (
-            BackendUtility::isTableWorkspaceEnabled($table)
+            $tableSupportsVersioning
             && !$moveRecVersionState->equals(VersionState::MOVE_PLACEHOLDER)
         ) {
             // Create version of record first, if it does not exist
-            if (empty($WSversion['uid'])) {
+            if (empty($workspaceVersion['uid'])) {
                 $dataHandler->versionizeRecord($table, $uid, 'MovePointer');
-                $WSversion = BackendUtility::getWorkspaceVersionOfRecord($dataHandler->BE_USER->workspace, $table, $uid, 'uid,t3ver_oid');
+                $workspaceVersion = BackendUtility::getWorkspaceVersionOfRecord($dataHandler->BE_USER->workspace, $table, $uid, 'uid,t3ver_oid');
                 if ((int)$resolvedPid !== (int)$propArr['pid']) {
                     $this->moveRecord_processFields($dataHandler, $resolvedPid, $table, $uid);
                 }
-            } elseif ($dataHandler->isRecordCopied($table, $uid) && (int)$dataHandler->copyMappingArray[$table][$uid] === (int)$WSversion['uid']) {
+            } elseif ($dataHandler->isRecordCopied($table, $uid) && (int)$dataHandler->copyMappingArray[$table][$uid] === (int)$workspaceVersion['uid']) {
                 // If the record has been versioned before (e.g. cascaded parent-child structure), create only the move-placeholders
                 if ((int)$resolvedPid !== (int)$propArr['pid']) {
                     $this->moveRecord_processFields($dataHandler, $resolvedPid, $table, $uid);
@@ -358,34 +349,29 @@ class DataHandlerHook
         $workspaceAccessBlocked = [];
         // Element was in "New/Deleted/Moved" so it can be moved...
         $recIsNewVersion = $moveRecVersionState->indicatesPlaceholder();
-        $destRes = $dataHandler->BE_USER->workspaceAllowLiveRecordsInPID($resolvedPid, $table);
-        $canMoveRecord = ($recIsNewVersion || BackendUtility::isTableWorkspaceEnabled($table));
+        $recordMustNotBeVersionized = $dataHandler->BE_USER->workspaceAllowsLiveEditingInTable($table);
+        $canMoveRecord = $recIsNewVersion || $tableSupportsVersioning;
         // Workspace source check:
         if (!$recIsNewVersion) {
-            $errorCode = $dataHandler->BE_USER->workspaceCannotEditRecord($table, $WSversion['uid'] ? $WSversion['uid'] : $uid);
+            $errorCode = $dataHandler->BE_USER->workspaceCannotEditRecord($table, $workspaceVersion['uid'] ?: $uid);
             if ($errorCode) {
                 $workspaceAccessBlocked['src1'] = 'Record could not be edited in workspace: ' . $errorCode . ' ';
-            } elseif (!$canMoveRecord && $dataHandler->BE_USER->workspaceAllowLiveRecordsInPID($moveRec['pid'], $table) <= 0) {
+            } elseif (!$canMoveRecord && !$recordMustNotBeVersionized) {
                 $workspaceAccessBlocked['src2'] = 'Could not remove record from table "' . $table . '" from its page "' . $moveRec['pid'] . '" ';
             }
         }
         // Workspace destination check:
-        // All records can be inserted if $destRes is greater than zero.
-        // Only new versions can be inserted if $destRes is FALSE.
-        // NO RECORDS can be inserted if $destRes is negative which indicates a stage
-        //  not allowed for use. If "versioningWS" is version 2, moving can take place of versions.
-        // since TYPO3 CMS 7, version2 is the default and the only option
-        if (!($destRes > 0 || $canMoveRecord && !$destRes)) {
+        // All records can be inserted if $recordMustNotBeVersionized is true.
+        // Only new versions can be inserted if $recordMustNotBeVersionized is FALSE.
+        if (!($recordMustNotBeVersionized || $canMoveRecord && !$recordMustNotBeVersionized)) {
             $workspaceAccessBlocked['dest1'] = 'Could not insert record from table "' . $table . '" in destination PID "' . $resolvedPid . '" ';
-        } elseif ($destRes == 1 && $WSversion['uid']) {
-            $workspaceAccessBlocked['dest2'] = 'Could not insert other versions in destination PID ';
         }
+
         if (empty($workspaceAccessBlocked)) {
             // If the move operation is done on a versioned record, which is
-            // NOT new/deleted placeholder and versioningWS is in version 2, then...
-            // since TYPO3 CMS 7, version2 is the default and the only option
-            if ($WSversion['uid'] && !$recIsNewVersion && BackendUtility::isTableWorkspaceEnabled($table)) {
-                $this->moveRecord_wsPlaceholders($table, $uid, $destPid, $WSversion['uid'], $dataHandler);
+            // NOT new/deleted placeholder, then also create a move placeholder
+            if ($workspaceVersion['uid'] && !$recIsNewVersion && BackendUtility::isTableWorkspaceEnabled($table)) {
+                $this->moveRecord_wsPlaceholders($table, (int)$uid, (int)$destPid, (int)$workspaceVersion['uid'], $dataHandler);
             } else {
                 // moving not needed, just behave like in live workspace
                 $recordWasMoved = false;
@@ -418,7 +404,6 @@ class DataHandlerHook
                 $resolvedPageId,
                 $table,
                 $uid,
-                $field,
                 $value,
                 $GLOBALS['TCA'][$table]['columns'][$field]['config']
             );
@@ -432,11 +417,10 @@ class DataHandlerHook
      * @param int $resolvedPageId Resolved real destination page id
      * @param string $table Name of parent table
      * @param int $uid UID of the parent record
-     * @param string $field Name of the field of the parent record
      * @param string $value Value of the field of the parent record
      * @param array $configuration TCA field configuration of the parent record
      */
-    protected function moveRecord_processFieldValue(DataHandler $dataHandler, $resolvedPageId, $table, $uid, $field, $value, array $configuration)
+    protected function moveRecord_processFieldValue(DataHandler $dataHandler, $resolvedPageId, $table, $uid, $value, array $configuration): void
     {
         $inlineFieldType = $dataHandler->getInlineFieldType($configuration);
         $inlineProcessing = (
@@ -481,7 +465,7 @@ class DataHandlerHook
      * @param DataHandler $dataHandler DataHandler object
      * @param array $notificationAlternativeRecipients List of recipients to notify instead of be_users selected by sys_workspace, list is generated by workspace extension module
      */
-    protected function notifyStageChange(array $stat, $stageId, $table, $id, $comment, DataHandler $dataHandler, array $notificationAlternativeRecipients = [])
+    protected function notifyStageChange(array $stat, $stageId, $table, $id, $comment, DataHandler $dataHandler, array $notificationAlternativeRecipients = []): void
     {
         $workspaceRec = BackendUtility::getRecord('sys_workspace', $stat['uid']);
         // So, if $id is not set, then $table is taken to be the complete element name!
@@ -497,11 +481,10 @@ class DataHandlerHook
             // Compile list of recipients:
             $emails = [];
             switch ((int)$stat['stagechg_notification']) {
+                // Notify users of next stage only
                 case 1:
                     switch ((int)$stageId) {
                         case 1:
-                            $emails = $this->getEmailsForStageChangeNotification($workspaceRec['reviewers']);
-                            break;
                         case 10:
                             $emails = $this->getEmailsForStageChangeNotification($workspaceRec['adminusers'], true);
                             break;
@@ -558,9 +541,9 @@ class DataHandlerHook
                             $emails = $this->getEmailsForStageChangeNotification($workspaceRec['adminusers'], true);
                     }
                     break;
+                // Notify all users at all changes
                 case 10:
                     $emails = $this->getEmailsForStageChangeNotification($workspaceRec['adminusers'], true);
-                    $emails = $this->getEmailsForStageChangeNotification($workspaceRec['reviewers']) + $emails;
                     $emails = $this->getEmailsForStageChangeNotification($workspaceRec['members']) + $emails;
                     break;
                 default:
@@ -604,8 +587,6 @@ class DataHandlerHook
                 '###USER_FULLNAME###' => $dataHandler->BE_USER->user['realName'],
                 '###USER_USERNAME###' => $dataHandler->BE_USER->user['username']
             ];
-            // add marker for preview links if workspace extension is loaded
-            $this->workspaceService = GeneralUtility::makeInstance(WorkspaceService::class);
             // only generate the link if the marker is in the template - prevents database from getting to much entries
             if (GeneralUtility::isFirstPartOfStr($emailConfig['message'], 'LLL:')) {
                 $tempEmailMessage = $this->getLanguageService()->sL($emailConfig['message']);
@@ -692,15 +673,16 @@ class DataHandlerHook
      * @param bool $noTablePrefix If set, the input list are integers and not strings.
      * @return array Array of emails
      */
-    protected function getEmailsForStageChangeNotification($listOfUsers, $noTablePrefix = false)
+    protected function getEmailsForStageChangeNotification($listOfUsers, bool $noTablePrefix = false): array
     {
         $users = GeneralUtility::trimExplode(',', $listOfUsers, true);
         $emails = [];
         foreach ($users as $userIdent) {
+            $table = '';
             if ($noTablePrefix) {
                 $id = (int)$userIdent;
             } else {
-                list($table, $id) = GeneralUtility::revExplode('_', $userIdent, 2);
+                [$table, $id] = GeneralUtility::revExplode('_', $userIdent, 2);
             }
             if ($table === 'be_users' || $noTablePrefix) {
                 if ($userRecord = BackendUtility::getRecord('be_users', $id, 'uid,email,lang,realName', BackendUtility::BEenableFields('be_users'))) {
@@ -723,11 +705,10 @@ class DataHandlerHook
      * @param int $id
      * @param int $stageId Stage ID to set
      * @param string $comment Comment that goes into log
-     * @param bool $notificationEmailInfo Accumulate state changes in memory for compiled notification email?
      * @param DataHandler $dataHandler DataHandler object
      * @param array $notificationAlternativeRecipients comma separated list of recipients to notify instead of normal be_users
      */
-    protected function version_setStage($table, $id, $stageId, $comment = '', $notificationEmailInfo = false, DataHandler $dataHandler, array $notificationAlternativeRecipients = [])
+    protected function version_setStage($table, $id, $stageId, string $comment, DataHandler $dataHandler, array $notificationAlternativeRecipients = [])
     {
         if ($errorCode = $dataHandler->BE_USER->workspaceCannotEditOfflineVersion($table, $id)) {
             $dataHandler->newlog('Attempt to set stage for record failed: ' . $errorCode, 1);
@@ -755,13 +736,9 @@ class DataHandlerHook
                 // TEMPORARY, except 6-30 as action/detail number which is observed elsewhere!
                 $dataHandler->log($table, $id, 6, 0, 0, 'Stage raised...', 30, ['comment' => $comment, 'stage' => $stageId]);
                 if ((int)$stat['stagechg_notification'] > 0) {
-                    if ($notificationEmailInfo) {
-                        $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['shared'] = [$stat, $stageId, $comment];
-                        $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['elements'][] = $table . ':' . $id;
-                        $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['alternativeRecipients'] = $notificationAlternativeRecipients;
-                    } else {
-                        $this->notifyStageChange($stat, $stageId, $table, $id, $comment, $dataHandler, $notificationAlternativeRecipients);
-                    }
+                    $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['shared'] = [$stat, $stageId, $comment];
+                    $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['elements'][] = $table . ':' . $id;
+                    $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['alternativeRecipients'] = $notificationAlternativeRecipients;
                 }
             } else {
                 $dataHandler->newlog('The member user tried to set a stage value "' . $stageId . '" that was not allowed', 1);
@@ -785,12 +762,10 @@ class DataHandlerHook
      * @param bool $swapIntoWS If set, swaps online into workspace instead of publishing out of workspace.
      * @param DataHandler $dataHandler DataHandler object
      * @param string $comment Notification comment
-     * @param bool $notificationEmailInfo Accumulate state changes in memory for compiled notification email?
      * @param array $notificationAlternativeRecipients comma separated list of recipients to notificate instead of normal be_users
      */
-    protected function version_swap($table, $id, $swapWith, $swapIntoWS = false, DataHandler $dataHandler, $comment = '', $notificationEmailInfo = false, $notificationAlternativeRecipients = [])
+    protected function version_swap($table, $id, $swapWith, bool $swapIntoWS, DataHandler $dataHandler, string $comment, $notificationAlternativeRecipients = [])
     {
-
         // Check prerequisites before start swapping
 
         // Skip records that have been deleted during the current execution
@@ -800,7 +775,14 @@ class DataHandlerHook
 
         // First, check if we may actually edit the online record
         if (!$dataHandler->checkRecordUpdateAccess($table, $id)) {
-            $dataHandler->newlog('Error: You cannot swap versions for a record you do not have access to edit!', 1);
+            $dataHandler->newlog(
+                sprintf(
+                    'Error: You cannot swap versions for record %s:%d you do not have access to edit!',
+                    $table,
+                    $id
+                ),
+                1
+            );
             return;
         }
         // Select the two versions:
@@ -809,7 +791,15 @@ class DataHandlerHook
         $movePlh = [];
         $movePlhID = 0;
         if (!(is_array($curVersion) && is_array($swapVersion))) {
-            $dataHandler->newlog('Error: Either online or swap version could not be selected!', 2);
+            $dataHandler->newlog(
+                sprintf(
+                    'Error: Either online or swap version for %s:%d->%d could not be selected!',
+                    $table,
+                    $id,
+                    $swapWith
+                ),
+                2
+            );
             return;
         }
         if (!$dataHandler->BE_USER->workspacePublishAccess($swapVersion['t3ver_wsid'])) {
@@ -830,8 +820,8 @@ class DataHandlerHook
             return;
         }
         // Check if the swapWith record really IS a version of the original!
-        if (!(((int)$swapVersion['pid'] == -1 && (int)$curVersion['pid'] >= 0) && (int)$swapVersion['t3ver_oid'] === (int)$id)) {
-            $dataHandler->newlog('In swap version, either pid was not -1 or the t3ver_oid didn\'t match the id of the online version as it must!', 2);
+        if (!(((int)$swapVersion['t3ver_oid'] > 0 && (int)$curVersion['t3ver_oid'] === 0) && (int)$swapVersion['t3ver_oid'] === (int)$id)) {
+            $dataHandler->newlog('In swap version, either t3ver_oid was not set or the t3ver_oid didn\'t match the id of the online version as it must!', 2);
             return;
         }
         // Lock file name:
@@ -869,7 +859,6 @@ class DataHandlerHook
         // Preserve states:
         $t3ver_state = [];
         $t3ver_state['swapVersion'] = $swapVersion['t3ver_state'];
-        $t3ver_state['curVersion'] = $curVersion['t3ver_state'];
         // Modify offline version to become online:
         $tmp_wsid = $swapVersion['t3ver_wsid'];
         // Set pid for ONLINE
@@ -915,7 +904,7 @@ class DataHandlerHook
         if (is_array($GLOBALS['TCA'][$table]['columns'])) {
             foreach ($GLOBALS['TCA'][$table]['columns'] as $field => $fieldConf) {
                 if (isset($fieldConf['config']) && is_array($fieldConf['config'])) {
-                    $this->version_swap_processFields($table, $field, $fieldConf['config'], $curVersion, $swapVersion, $dataHandler);
+                    $this->version_swap_processFields($table, $fieldConf['config'], $curVersion, $swapVersion, $dataHandler);
                 }
             }
         }
@@ -1028,7 +1017,7 @@ class DataHandlerHook
             $dataHandler->addRemapStackRefIndex($table, $id);
             // Set log entry for live record:
             $propArr = $dataHandler->getRecordPropertiesFromRow($table, $swapVersion);
-            if ($propArr['_ORIG_pid'] == -1) {
+            if ($propArr['t3ver_oid'] ?? 0 > 0) {
                 $label = $this->getLanguageService()->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang_tcemain.xlf:version_swap.offline_record_updated');
             } else {
                 $label = $this->getLanguageService()->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang_tcemain.xlf:version_swap.online_record_updated');
@@ -1039,7 +1028,7 @@ class DataHandlerHook
             $dataHandler->addRemapStackRefIndex($table, $swapWith);
             // Set log entry for offline record:
             $propArr = $dataHandler->getRecordPropertiesFromRow($table, $curVersion);
-            if ($propArr['_ORIG_pid'] == -1) {
+            if ($propArr['t3ver_oid'] ?? 0 > 0) {
                 $label = $this->getLanguageService()->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang_tcemain.xlf:version_swap.offline_record_updated');
             } else {
                 $label = $this->getLanguageService()->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang_tcemain.xlf:version_swap.online_record_updated');
@@ -1047,16 +1036,12 @@ class DataHandlerHook
             $theLogId = $dataHandler->log($table, $swapWith, 2, $propArr['pid'], 0, $label, 10, [$propArr['header'], $table . ':' . $swapWith], $propArr['event_pid']);
             $dataHandler->setHistory($table, $swapWith, $theLogId);
 
-            $stageId = -20; // \TYPO3\CMS\Workspaces\Service\StagesService::STAGE_PUBLISH_EXECUTE_ID;
-            if ($notificationEmailInfo) {
-                $notificationEmailInfoKey = $wsAccess['uid'] . ':' . $stageId . ':' . $comment;
-                $this->notificationEmailInfo[$notificationEmailInfoKey]['shared'] = [$wsAccess, $stageId, $comment];
-                $this->notificationEmailInfo[$notificationEmailInfoKey]['elements'][] = $table . ':' . $id;
-                $this->notificationEmailInfo[$notificationEmailInfoKey]['alternativeRecipients'] = $notificationAlternativeRecipients;
-            } else {
-                $this->notifyStageChange($wsAccess, $stageId, $table, $id, $comment, $dataHandler, $notificationAlternativeRecipients);
-            }
-            // Write to log with stageId -20
+            $stageId = StagesService::STAGE_PUBLISH_EXECUTE_ID;
+            $notificationEmailInfoKey = $wsAccess['uid'] . ':' . $stageId . ':' . $comment;
+            $this->notificationEmailInfo[$notificationEmailInfoKey]['shared'] = [$wsAccess, $stageId, $comment];
+            $this->notificationEmailInfo[$notificationEmailInfoKey]['elements'][] = $table . ':' . $id;
+            $this->notificationEmailInfo[$notificationEmailInfoKey]['alternativeRecipients'] = $notificationAlternativeRecipients;
+            // Write to log with stageId -20 (STAGE_PUBLISH_EXECUTE_ID)
             if ($dataHandler->enableLogging) {
                 $propArr = $dataHandler->getRecordProperties($table, $id);
                 $pid = $propArr['pid'];
@@ -1066,9 +1051,8 @@ class DataHandlerHook
 
             // Clear cache:
             $dataHandler->registerRecordIdForPageCacheClearing($table, $id);
-            // Checking for "new-placeholder" and if found, delete it (BUT FIRST after swapping!):
-            if (!$swapIntoWS && $t3ver_state['curVersion'] > 0) {
-                // For delete + completely delete!
+            // If not swapped, delete the record from the database
+            if (!$swapIntoWS) {
                 $dataHandler->deleteEl($table, $swapWith, true, true);
             }
 
@@ -1082,34 +1066,16 @@ class DataHandlerHook
     }
 
     /**
-     * Writes remapped foreign field (IRRE).
-     *
-     * @param RelationHandler $dbAnalysis Instance that holds the sorting order of child records
-     * @param array $configuration The TCA field configuration
-     * @param int $parentId The uid of the parent record
-     */
-    public function writeRemappedForeignField(RelationHandler $dbAnalysis, array $configuration, $parentId)
-    {
-        foreach ($dbAnalysis->itemArray as &$item) {
-            if (isset($this->remappedIds[$item['table']][$item['id']])) {
-                $item['id'] = $this->remappedIds[$item['table']][$item['id']];
-            }
-        }
-        $dbAnalysis->writeForeignField($configuration, $parentId);
-    }
-
-    /**
      * Processes fields of a record for the publishing/swapping process.
      * Basically this takes care of IRRE (type "inline") child references.
      *
      * @param string $tableName Table name
-     * @param string $fieldName: Field name
      * @param array $configuration TCA field configuration
      * @param array $liveData: Live record data
      * @param array $versionData: Version record data
      * @param DataHandler $dataHandler Calling data-handler object
      */
-    protected function version_swap_processFields($tableName, $fieldName, array $configuration, array $liveData, array $versionData, DataHandler $dataHandler)
+    protected function version_swap_processFields($tableName, array $configuration, array $liveData, array $versionData, DataHandler $dataHandler)
     {
         $inlineType = $dataHandler->getInlineFieldType($configuration);
         if ($inlineType !== 'field') {
@@ -1125,20 +1091,20 @@ class DataHandlerHook
         $versionRelations->setUseLiveReferenceIds(false);
         $versionRelations->start('', $foreignTable, '', $versionData['uid'], $tableName, $configuration);
         // Update relations for both (workspace/versioning) sites:
-        if (count($liveRelations->itemArray)) {
+        if (!empty($liveRelations->itemArray)) {
             $dataHandler->addRemapAction(
                 $tableName,
                 $liveData['uid'],
                 [$this, 'updateInlineForeignFieldSorting'],
-                [$tableName, $liveData['uid'], $foreignTable, $liveRelations->tableArray[$foreignTable], $configuration, $dataHandler->BE_USER->workspace]
+                [$liveData['uid'], $foreignTable, $liveRelations->tableArray[$foreignTable], $configuration, $dataHandler->BE_USER->workspace]
             );
         }
-        if (count($versionRelations->itemArray)) {
+        if (!empty($versionRelations->itemArray)) {
             $dataHandler->addRemapAction(
                 $tableName,
                 $liveData['uid'],
                 [$this, 'updateInlineForeignFieldSorting'],
-                [$tableName, $liveData['uid'], $foreignTable, $versionRelations->tableArray[$foreignTable], $configuration, 0]
+                [$liveData['uid'], $foreignTable, $versionRelations->tableArray[$foreignTable], $configuration, 0]
             );
         }
     }
@@ -1152,7 +1118,6 @@ class DataHandlerHook
      * Sorting fields ("sortby") are not modified during the
      * workspace publishing/swapping process directly.
      *
-     * @param string $parentTableName
      * @param string $parentId
      * @param string $foreignTableName
      * @param int[] $foreignIds
@@ -1160,7 +1125,7 @@ class DataHandlerHook
      * @param int $targetWorkspaceId
      * @internal
      */
-    public function updateInlineForeignFieldSorting($parentTableName, $parentId, $foreignTableName, $foreignIds, array $configuration, $targetWorkspaceId)
+    public function updateInlineForeignFieldSorting($parentId, $foreignTableName, $foreignIds, array $configuration, $targetWorkspaceId)
     {
         $remappedIds = [];
         // Use remapped ids (live id <-> version id)
@@ -1181,70 +1146,65 @@ class DataHandlerHook
     }
 
     /**
-     * Release version from this workspace (and into "Live" workspace but as an offline version).
+     * Remove a versioned record from this workspace. Often referred to as "dicarding a version" = throwing away a version.
+     * This means to delete the record and remove any placeholders that are not needed anymore.
      *
-     * @param string $table Table name
-     * @param int $id Record UID
+     * In previous versions, this meant that the versioned record was marked as deleted and moved into "live" workspace.
+     *
+     * @param string $table Database table name
+     * @param int $versionId Version record uid
      * @param bool $flush If set, will completely delete element
      * @param DataHandler $dataHandler DataHandler object
      */
-    protected function version_clearWSID($table, $id, $flush = false, DataHandler $dataHandler)
+    protected function version_clearWSID(string $table, int $versionId, bool $flush, DataHandler $dataHandler): void
     {
-        if ($errorCode = $dataHandler->BE_USER->workspaceCannotEditOfflineVersion($table, $id)) {
+        if ($errorCode = $dataHandler->BE_USER->workspaceCannotEditOfflineVersion($table, $versionId)) {
             $dataHandler->newlog('Attempt to reset workspace for record failed: ' . $errorCode, 1);
             return;
         }
-        if (!$dataHandler->checkRecordUpdateAccess($table, $id)) {
+        if (!$dataHandler->checkRecordUpdateAccess($table, $versionId)) {
             $dataHandler->newlog('Attempt to reset workspace for record failed because you do not have edit access', 1);
             return;
         }
-        $liveRec = BackendUtility::getLiveVersionOfRecord($table, $id, 'uid,t3ver_state');
-        if (!$liveRec) {
+        $liveRecord = BackendUtility::getLiveVersionOfRecord($table, $versionId, 'uid,t3ver_state');
+        if (!$liveRecord) {
+            // Attempting to discard a record that has no live version, don't do anything
             return;
         }
-        // Clear workspace ID:
-        $updateData = [
-            't3ver_wsid' => 0,
-            't3ver_tstamp' => $GLOBALS['EXEC_TIME']
-        ];
-        $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
-        $connection->update(
-            $table,
-            $updateData,
-            ['uid' => (int)$id]
-        );
 
-        // Clear workspace ID for live version AND DELETE IT as well because it is a new record!
-        if (
-            VersionState::cast($liveRec['t3ver_state'])->equals(VersionState::NEW_PLACEHOLDER)
-            || VersionState::cast($liveRec['t3ver_state'])->equals(VersionState::DELETE_PLACEHOLDER)
-        ) {
+        $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
+        $liveState = VersionState::cast($liveRecord['t3ver_state']);
+        $versionRecord = BackendUtility::getRecord($table, $versionId);
+        $versionState = VersionState::cast($versionRecord['t3ver_state']);
+        $deleteField = $GLOBALS['TCA'][$table]['ctrl']['delete'] ?? null;
+
+        // purge delete placeholder since it would not contain any modified information
+        if ($flush || $versionState->equals(VersionState::DELETE_PLACEHOLDER)) {
+            $dataHandler->deleteEl($table, $versionRecord['uid'], true, true);
+        // let DataHandler decide how to delete the record that does not have a deleted field
+        } elseif ($deleteField === null) {
+            $dataHandler->deleteEl($table, $versionRecord['uid'], true);
+        // update record directly in order to avoid delete cascades on this version
+        } else {
             $connection->update(
                 $table,
-                $updateData,
-                ['uid' => (int)$liveRec['uid']]
+                ['t3ver_tstamp' => $GLOBALS['EXEC_TIME'], $deleteField => 1],
+                ['uid' => (int)$versionId]
             );
+        }
 
+        // purge move placeholder as it has been created just for the sake of pointing to a version
+        if ($liveState->equals(VersionState::MOVE_PLACEHOLDER)) {
+            $dataHandler->deleteEl($table, $liveRecord['uid'], true, true);
+        // purge new placeholder as it has been created just for the sake of pointing to a version
+        } elseif ($liveState->equals(VersionState::NEW_PLACEHOLDER)) {
+            $connection->update(
+                $table,
+                ['t3ver_tstamp' => $GLOBALS['EXEC_TIME']],
+                ['uid' => (int)$liveRecord['uid']]
+            );
             // THIS assumes that the record was placeholder ONLY for ONE record (namely $id)
-            $dataHandler->deleteEl($table, $liveRec['uid'], true);
-        }
-        // If "deleted" flag is set for the version that got released
-        // it doesn't make sense to keep that "placeholder" anymore and we delete it completly.
-        $wsRec = BackendUtility::getRecord($table, $id);
-        if (
-            $flush
-            || (
-                VersionState::cast($wsRec['t3ver_state'])->equals(VersionState::NEW_PLACEHOLDER)
-                || VersionState::cast($wsRec['t3ver_state'])->equals(VersionState::DELETE_PLACEHOLDER)
-            )
-        ) {
-            $dataHandler->deleteEl($table, $id, true, true);
-        }
-        // Remove the move-placeholder if found for live record.
-        if (BackendUtility::isTableWorkspaceEnabled($table)) {
-            if ($plhRec = BackendUtility::getMovePlaceholder($table, $liveRec['uid'], 'uid')) {
-                $dataHandler->deleteEl($table, $plhRec['uid'], true, true);
-            }
+            $dataHandler->deleteEl($table, $liveRecord['uid'], true);
         }
     }
 
@@ -1253,9 +1213,9 @@ class DataHandlerHook
      * for all existing records in that stage to avoid that any of these end up
      * as orphan records.
      *
-     * @param int $stageId Elements with this stage are resetted
+     * @param int $stageId Elements with this stage are reset
      */
-    protected function resetStageOfElements($stageId)
+    protected function resetStageOfElements(int $stageId): void
     {
         foreach ($this->getTcaTables() as $tcaTable) {
             if (BackendUtility::isTableWorkspaceEnabled($tcaTable)) {
@@ -1269,10 +1229,6 @@ class DataHandlerHook
                         $queryBuilder->expr()->eq(
                             't3ver_stage',
                             $queryBuilder->createNamedParameter($stageId, \PDO::PARAM_INT)
-                        ),
-                        $queryBuilder->expr()->eq(
-                            'pid',
-                            $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
                         ),
                         $queryBuilder->expr()->gt(
                             't3ver_wsid',
@@ -1289,7 +1245,7 @@ class DataHandlerHook
      *
      * @param int $workspaceId The workspace to be flushed
      */
-    protected function flushWorkspaceElements($workspaceId)
+    protected function flushWorkspaceElements(int $workspaceId): void
     {
         $command = [];
         foreach ($this->getTcaTables() as $tcaTable) {
@@ -1324,7 +1280,7 @@ class DataHandlerHook
      *
      * @return array
      */
-    protected function getTcaTables()
+    protected function getTcaTables(): array
     {
         return array_keys($GLOBALS['TCA']);
     }
@@ -1332,7 +1288,7 @@ class DataHandlerHook
     /**
      * @return DataHandler
      */
-    protected function getDataHandler()
+    protected function getDataHandler(): DataHandler
     {
         return GeneralUtility::makeInstance(DataHandler::class);
     }
@@ -1342,7 +1298,7 @@ class DataHandlerHook
      *
      * @param int $workspaceId The workspace to be flushed in cache
      */
-    protected function flushWorkspaceCacheEntriesByWorkspaceId($workspaceId)
+    protected function flushWorkspaceCacheEntriesByWorkspaceId(int $workspaceId): void
     {
         $workspacesCache = GeneralUtility::makeInstance(CacheManager::class)->getCache('workspaces_cache');
         $workspacesCache->flushByTag($workspaceId);
@@ -1382,7 +1338,7 @@ class DataHandlerHook
         }
         // Traversing all tables supporting versioning:
         foreach ($GLOBALS['TCA'] as $table => $cfg) {
-            if ($GLOBALS['TCA'][$table]['ctrl']['versioningWS'] && $table !== 'pages') {
+            if (BackendUtility::isTableWorkspaceEnabled($table) && $table !== 'pages') {
                 $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
                     ->getQueryBuilderForTable($table);
 
@@ -1395,9 +1351,9 @@ class DataHandlerHook
                     ->from($table, 'A')
                     ->from($table, 'B')
                     ->where(
-                        $queryBuilder->expr()->eq(
-                            'A.pid',
-                            $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
+                        $queryBuilder->expr()->gt(
+                            'A.t3ver_oid',
+                            $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
                         ),
                         $queryBuilder->expr()->eq(
                             'B.pid',
@@ -1437,7 +1393,7 @@ class DataHandlerHook
         }
         // Traversing all tables supporting versioning:
         foreach ($GLOBALS['TCA'] as $table => $cfg) {
-            if ($GLOBALS['TCA'][$table]['ctrl']['versioningWS'] && $table !== 'pages') {
+            if (BackendUtility::isTableWorkspaceEnabled($table) && $table !== 'pages') {
                 $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
                     ->getQueryBuilderForTable($table);
 
@@ -1450,9 +1406,9 @@ class DataHandlerHook
                     ->from($table, 'A')
                     ->from($table, 'B')
                     ->where(
-                        $queryBuilder->expr()->eq(
-                            'A.pid',
-                            $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
+                        $queryBuilder->expr()->gt(
+                            'A.t3ver_oid',
+                            $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
                         ),
                         $queryBuilder->expr()->in(
                             'B.pid',
@@ -1505,9 +1461,9 @@ class DataHandlerHook
             ->from($table, 'A')
             ->from($table, 'B')
             ->where(
-                $queryBuilder->expr()->eq(
-                    'A.pid',
-                    $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
+                $queryBuilder->expr()->gt(
+                    'A.t3ver_oid',
+                    $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
                 ),
                 $queryBuilder->expr()->eq(
                     'A.t3ver_wsid',
@@ -1543,7 +1499,7 @@ class DataHandlerHook
      *
      * @param array $idList List of page UIDs, possibly versioned
      */
-    public function findRealPageIds(array &$idList)
+    public function findRealPageIds(array &$idList): void
     {
         foreach ($idList as $key => $id) {
             $rec = BackendUtility::getRecord('pages', $id, 't3ver_oid');
@@ -1562,11 +1518,11 @@ class DataHandlerHook
      * @param string $table Table name to move
      * @param int $uid Record uid to move (online record)
      * @param int $destPid Position to move to: $destPid: >=0 then it points to a page-id on which to insert the record (as the first element). <0 then it points to a uid from its own table after which to insert it (works if
-     * @param int $wsUid UID of offline version of online record
+     * @param int $offlineUid UID of offline version of online record
      * @param DataHandler $dataHandler DataHandler object
      * @see moveRecord()
      */
-    protected function moveRecord_wsPlaceholders($table, $uid, $destPid, $wsUid, DataHandler $dataHandler)
+    protected function moveRecord_wsPlaceholders(string $table, int $uid, int $destPid, int $offlineUid, DataHandler $dataHandler): void
     {
         // If a record gets moved after a record that already has a placeholder record
         // then the new placeholder record needs to be after the existing one
@@ -1595,7 +1551,7 @@ class DataHandlerHook
 
             // Set values from the versioned record to the move placeholder
             if (!empty($shadowColumnsForMovePlaceholder)) {
-                $versionedRecord = BackendUtility::getRecord($table, $wsUid);
+                $versionedRecord = BackendUtility::getRecord($table, $offlineUid);
                 $shadowColumns = GeneralUtility::trimExplode(',', $shadowColumnsForMovePlaceholder, true);
                 foreach ($shadowColumns as $shadowColumn) {
                     if (isset($versionedRecord[$shadowColumn])) {
@@ -1657,7 +1613,7 @@ class DataHandlerHook
                 ->update(
                     $table,
                     $updateFields,
-                    ['uid' => (int)$wsUid]
+                    ['uid' => (int)$offlineUid]
                 );
         }
         // Check for the localizations of that element and move them as well
@@ -1670,7 +1626,7 @@ class DataHandlerHook
      * @param DataHandler $dataHandler DataHandler object
      * @return CommandMap
      */
-    public function getCommandMap(DataHandler $dataHandler)
+    public function getCommandMap(DataHandler $dataHandler): CommandMap
     {
         return GeneralUtility::makeInstance(
             CommandMap::class,
@@ -1687,13 +1643,10 @@ class DataHandlerHook
      * @param string $table Table name
      * @return array Array of fieldnames
      */
-    protected function getUniqueFields($table)
+    protected function getUniqueFields($table): array
     {
         $listArr = [];
-        if (empty($GLOBALS['TCA'][$table]['columns'])) {
-            return $listArr;
-        }
-        foreach ($GLOBALS['TCA'][$table]['columns'] as $field => $configArr) {
+        foreach ($GLOBALS['TCA'][$table]['columns'] ?? [] as $field => $configArr) {
             if ($configArr['config']['type'] === 'input') {
                 $evalCodesArray = GeneralUtility::trimExplode(',', $configArr['config']['eval'], true);
                 if (in_array('uniqueInPid', $evalCodesArray) || in_array('unique', $evalCodesArray)) {
@@ -1707,7 +1660,7 @@ class DataHandlerHook
     /**
      * @return RelationHandler
      */
-    protected function createRelationHandlerInstance()
+    protected function createRelationHandlerInstance(): RelationHandler
     {
         return GeneralUtility::makeInstance(RelationHandler::class);
     }
@@ -1715,7 +1668,7 @@ class DataHandlerHook
     /**
      * @return LanguageService
      */
-    protected function getLanguageService()
+    protected function getLanguageService(): LanguageService
     {
         return $GLOBALS['LANG'];
     }

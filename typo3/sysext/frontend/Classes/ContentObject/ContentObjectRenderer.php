@@ -31,6 +31,7 @@ use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryHelper;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\FrontendRestrictionContainer;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Html\HtmlParser;
 use TYPO3\CMS\Core\Imaging\ImageManipulation\Area;
 use TYPO3\CMS\Core\Imaging\ImageManipulation\CropVariantCollection;
@@ -50,6 +51,7 @@ use TYPO3\CMS\Core\Service\FlexFormService;
 use TYPO3\CMS\Core\Service\MarkerBasedTemplateService;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\TimeTracker\TimeTracker;
 use TYPO3\CMS\Core\TypoScript\Parser\TypoScriptParser;
 use TYPO3\CMS\Core\TypoScript\TypoScriptService;
@@ -68,7 +70,6 @@ use TYPO3\CMS\Frontend\ContentObject\Exception\ProductionExceptionHandler;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
 use TYPO3\CMS\Frontend\Http\UrlProcessorInterface;
 use TYPO3\CMS\Frontend\Imaging\GifBuilder;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 use TYPO3\CMS\Frontend\Resource\FilePathSanitizer;
 use TYPO3\CMS\Frontend\Service\TypoLinkCodecService;
 use TYPO3\CMS\Frontend\Typolink\AbstractTypolinkBuilder;
@@ -683,7 +684,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
     /**
      * Renders a content object
      *
-     * @param string $name The content object name, eg. "TEXT" or "USER" or "IMAGE
+     * @param string $name The content object name, eg. "TEXT" or "USER" or "IMAGE"
      * @param array $conf The array with TypoScript properties for the content object
      * @param string $TSkey A string label used for the internal debugging tracking.
      * @return string cObject output
@@ -1214,7 +1215,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
                         );
                     }
                     if ($dimension) {
-                        if (strstr($dimension, 'c') !== false && ($dimensionKey === 'width' || $dimensionKey === 'height')) {
+                        if (strpos($dimension, 'c') !== false && ($dimensionKey === 'width' || $dimensionKey === 'height')) {
                             $dimensionParts = explode('c', $dimension, 2);
                             $dimension = ((int)$dimensionParts[0] * $pixelDensity) . 'c';
                             if ($dimensionParts[1]) {
@@ -1408,7 +1409,8 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param string $content Input string
      * @param string $wrap A string where the first two parts separated by "|" (vertical line) will be wrapped around the input string
      * @return string Wrapped output string
-     * @see wrap(), cImage(), FILE()
+     * @see wrap()
+     * @see cImage()
      */
     public function linkWrap($content, $wrap)
     {
@@ -1429,7 +1431,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param array $conf TypoScript configuration properties
      * @param bool $longDesc If set, the longdesc attribute will be generated - must only be used for img elements!
      * @return string Parameter string containing alt and title parameters (if any)
-     * @see IMGTEXT(), FILE(), FORM(), cImage(), filelink()
+     * @see cImage()
      */
     public function getAltParam($conf, $longDesc = true)
     {
@@ -1466,7 +1468,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param array $conf TypoScript configuration properties
      * @param bool|int $addGlobal If set, will add the global config.ATagParams to the link
      * @return string String containing the parameters to the A tag (if non empty, with a leading space)
-     * @see IMGTEXT(), filelink(), makelinks(), typolink()
+     * @see typolink()
      */
     public function getATagParams($conf, $addGlobal = 1)
     {
@@ -2452,8 +2454,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
 
     /**
      * encodeForJavaScriptValue
-     * Escapes content to be used inside JavaScript strings. No quotes are added around the value
-     * as this can easily be done in TypoScript
+     * Escapes content to be used inside JavaScript strings. Single quotes are added around the value.
      *
      * @param string $content Input value undergoing processing in this function
      * @return string The processed input value
@@ -3009,7 +3010,8 @@ class ContentObjectRenderer implements LoggerAwareInterface
      *
      * @param array $conf TypoScript properties defining what to compare
      * @return bool
-     * @see stdWrap(), _parseFunc()
+     * @see stdWrap()
+     * @see _parseFunc()
      */
     public function checkIf($conf)
     {
@@ -3087,7 +3089,9 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param string $theValue The value to parse by the class \TYPO3\CMS\Core\Html\HtmlParser
      * @param array $conf TypoScript properties for the parser. See link.
      * @return string Return value.
-     * @see stdWrap(), \TYPO3\CMS\Core\Html\HtmlParser::HTMLparserConfig(), \TYPO3\CMS\Core\Html\HtmlParser::HTMLcleaner()
+     * @see stdWrap()
+     * @see \TYPO3\CMS\Core\Html\HtmlParser::HTMLparserConfig()
+     * @see \TYPO3\CMS\Core\Html\HtmlParser::HTMLcleaner()
      */
     public function HTMLparser_TSbridge($theValue, $conf)
     {
@@ -3102,7 +3106,8 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param string $content Input string being wrapped
      * @param string $wrap The wrap string, eg. "<strong></strong>" or more likely here '<a href="index.php?id={TSFE:id}"> | </a>' which will wrap the input string in a <a> tag linking to the current page.
      * @return string Output string wrapped in the wrapping value.
-     * @see insertData(), stdWrap()
+     * @see insertData()
+     * @see stdWrap()
      */
     public function dataWrap($content, $wrap)
     {
@@ -3120,7 +3125,9 @@ class ContentObjectRenderer implements LoggerAwareInterface
      *
      * @param string $str Input value
      * @return string Processed input value
-     * @see getData(), stdWrap(), dataWrap()
+     * @see getData()
+     * @see stdWrap()
+     * @see dataWrap()
      */
     public function insertData($str)
     {
@@ -3420,7 +3427,8 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param array $conf TypoScript properties for "split
      * @return string Compiled result
      * @internal
-     * @see stdWrap(), \TYPO3\CMS\Frontend\ContentObject\Menu\AbstractMenuContentObject::processItemStates()
+     * @see stdWrap()
+     * @see \TYPO3\CMS\Frontend\ContentObject\Menu\AbstractMenuContentObject::processItemStates()
      */
     public function splitObj($value, $conf)
     {
@@ -3850,7 +3858,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
                                 $newstring .= $pieces[0];
                                 $match_len = strlen($data) - (strlen($pieces[0]) + strlen($pieces[1]));
                                 $inTag = false;
-                                if (strstr($pieces[0], '<') || strstr($pieces[0], '>')) {
+                                if (strpos($pieces[0], '<') !== false || strpos($pieces[0], '>') !== false) {
                                     // Returns TRUE, if a '<' is closer to the string-end than '>'.
                                     // This is the case if we're INSIDE a tag (that could have been
                                     // made by makelinks...) and we must secure, that the inside of a tag is
@@ -4130,14 +4138,14 @@ class ContentObjectRenderer implements LoggerAwareInterface
                     $keep = $conf['keep'];
                     $linkParts = parse_url($scheme . $parts[0]);
                     $linktxt = '';
-                    if (strstr($keep, 'scheme')) {
+                    if (strpos($keep, 'scheme') !== false) {
                         $linktxt = $scheme;
                     }
                     $linktxt .= $linkParts['host'];
-                    if (strstr($keep, 'path')) {
+                    if (strpos($keep, 'path') !== false) {
                         $linktxt .= $linkParts['path'];
                         // Added $linkParts['query'] 3/12
-                        if (strstr($keep, 'query') && $linkParts['query']) {
+                        if (strpos($keep, 'query') !== false && $linkParts['query']) {
                             $linktxt .= '?' . $linkParts['query'];
                         } elseif ($linkParts['path'] === '/') {
                             $linktxt = substr($linktxt, 0, -1);
@@ -4242,7 +4250,8 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param string|File|FileReference $file A "imgResource" TypoScript data type. Either a TypoScript file resource, a file or a file reference object or the string GIFBUILDER. See description above.
      * @param array $fileArray TypoScript properties for the imgResource type
      * @return array|null Returns info-array
-     * @see IMG_RESOURCE(), cImage(), \TYPO3\CMS\Frontend\Imaging\GifBuilder
+     * @see cImage()
+     * @see \TYPO3\CMS\Frontend\Imaging\GifBuilder
      */
     public function getImgResource($file, $fileArray)
     {
@@ -4475,7 +4484,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
      */
     public function getFieldVal($field)
     {
-        if (!strstr($field, '//')) {
+        if (strpos($field, '//') === false) {
             return $this->data[trim($field)] ?? null;
         }
         $sections = GeneralUtility::trimExplode('//', $field, true);
@@ -4711,6 +4720,8 @@ class ContentObjectRenderer implements LoggerAwareInterface
                         if ($site instanceof Site) {
                             if ($key === 'identifier') {
                                 $retVal = $site->getIdentifier();
+                            } elseif ($key === 'base') {
+                                $retVal = $site->getBase();
                             } else {
                                 try {
                                     $retVal = ArrayUtility::getValueByPath($site->getConfiguration(), $key, '.');
@@ -4982,7 +4993,8 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param string $linkText The string (text) to link
      * @param array $conf TypoScript configuration (see link below)
      * @return string A link-wrapped string.
-     * @see stdWrap(), \TYPO3\CMS\Frontend\Plugin\AbstractPlugin::pi_linkTP()
+     * @see stdWrap()
+     * @see \TYPO3\CMS\Frontend\Plugin\AbstractPlugin::pi_linkTP()
      */
     public function typoLink($linkText, $conf)
     {
@@ -5118,6 +5130,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
 
         // Prevent trouble with double and missing spaces between attributes and merge params before implode
         $finalTagAttributes = array_merge($tagAttributes, GeneralUtility::get_tag_attributes($finalTagParts['aTagParams']));
+        $finalTagAttributes = $this->addSecurityRelValues($finalTagAttributes, $target, $tagAttributes['href']);
         $finalAnchorTag = '<a ' . GeneralUtility::implodeAttributes($finalTagAttributes) . '>';
 
         if (!empty($finalTagParts['aTagParams'])) {
@@ -5164,6 +5177,66 @@ class ContentObjectRenderer implements LoggerAwareInterface
             return $finalAnchorTag . $this->wrap($linkText, $wrap) . '</a>';
         }
         return $this->wrap($finalAnchorTag . $linkText . '</a>', $wrap);
+    }
+
+    protected function addSecurityRelValues(array $tagAttributes, string $target, string $url): array
+    {
+        $relAttribute = 'noopener noreferrer';
+        if ($target !== '_blank' || $this->isInternalUrl($url)) {
+            return $tagAttributes;
+        }
+
+        if (!isset($tagAttributes['rel'])) {
+            $tagAttributes['rel'] = $relAttribute;
+            return $tagAttributes;
+        }
+
+        $tagAttributes['rel'] = implode(' ', array_unique(array_merge(
+            GeneralUtility::trimExplode(' ', $relAttribute),
+            GeneralUtility::trimExplode(' ', $tagAttributes['rel'])
+        )));
+
+        return $tagAttributes;
+    }
+
+    /**
+     * Checks whether the given url is an internal url.
+     *
+     * It will check the host part only, against all configured sites
+     * whether the given host is any. If so, the url is considered internal
+     *
+     * @param string $url The url to check.
+     * @return bool
+     * @throws \TYPO3\CMS\Core\Cache\Exception\NoSuchCacheException
+     */
+    protected function isInternalUrl(string $url): bool
+    {
+        $cache = GeneralUtility::makeInstance(CacheManager::class)->getCache('runtime');
+        $parsedUrl = parse_url($url);
+        $foundDomains = 0;
+        if (!isset($parsedUrl['host'])) {
+            return true;
+        }
+
+        $cacheIdentifier = sha1('isInternalDomain' . $parsedUrl['host']);
+
+        if ($cache->has($cacheIdentifier) === false) {
+            foreach (GeneralUtility::makeInstance(SiteFinder::class)->getAllSites() as $site) {
+                if ($site->getBase()->getHost() === $parsedUrl['host']) {
+                    ++$foundDomains;
+                    break;
+                }
+
+                if ($site->getBase()->getHost() === '' && GeneralUtility::isOnCurrentHost($url)) {
+                    ++$foundDomains;
+                    break;
+                }
+            }
+
+            $cache->set($cacheIdentifier, $foundDomains > 0);
+        }
+
+        return (bool)$cache->get($cacheIdentifier);
     }
 
     /**
@@ -5440,24 +5513,19 @@ class ContentObjectRenderer implements LoggerAwareInterface
     public function getQueryArguments($conf, $overruleQueryArguments = [], $forceOverruleArguments = false)
     {
         $method = (string)($conf['method'] ?? '');
-        switch ($method) {
-            case 'GET':
-                $currentQueryArray = GeneralUtility::_GET();
-                break;
-            case 'POST':
-                $currentQueryArray = GeneralUtility::_POST();
-                break;
-            case 'GET,POST':
-                $currentQueryArray = GeneralUtility::_GET();
-                ArrayUtility::mergeRecursiveWithOverrule($currentQueryArray, GeneralUtility::_POST());
-                break;
-            case 'POST,GET':
-                $currentQueryArray = GeneralUtility::_POST();
-                ArrayUtility::mergeRecursiveWithOverrule($currentQueryArray, GeneralUtility::_GET());
-                break;
-            default:
-                $currentQueryArray = [];
-                parse_str($this->getEnvironmentVariable('QUERY_STRING'), $currentQueryArray);
+        if ($method === 'POST') {
+            trigger_error('Assigning typolink.addQueryString.method = POST is not supported anymore since TYPO3 v10.0.', E_USER_WARNING);
+            return '';
+        }
+        if ($method === 'GET,POST' || $method === 'POST,GET') {
+            trigger_error('Assigning typolink.addQueryString.method = GET,POST or POST,GET is not supported anymore since TYPO3 v10.0 - falling back to GET.', E_USER_WARNING);
+            $method = 'GET';
+        }
+        if ($method === 'GET') {
+            $currentQueryArray = GeneralUtility::_GET();
+        } else {
+            $currentQueryArray = [];
+            parse_str($this->getEnvironmentVariable('QUERY_STRING'), $currentQueryArray);
         }
         if ($conf['exclude'] ?? false) {
             $excludeString = str_replace(',', '&', $conf['exclude']);
@@ -5527,7 +5595,9 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param array $conf The TypoScript configuration to pass the function
      * @param string $content The content string to pass the function
      * @return string The return content from the function call. Should probably be a string.
-     * @see USER(), stdWrap(), typoLink(), _parseFunc()
+     * @see stdWrap()
+     * @see typoLink()
+     * @see _parseFunc()
      */
     public function callUserFunction($funcName, $conf, $content)
     {
@@ -5696,9 +5766,11 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param string $senderName Optional "From" name
      * @param string $replyTo Optional "Reply-To" header email address.
      * @return bool Returns TRUE if sent
+     * @deprecated ContentObjectRenderer::sendNotifyEmail is deprecated and will be removed in TYPO3 v11. Consider using the mail API directly
      */
     public function sendNotifyEmail($message, $recipients, $cc, $senderAddress, $senderName = '', $replyTo = '')
     {
+        trigger_error('ContentObjectRenderer::sendNotifyEmail is deprecated and will be removed in TYPO3 v11. Consider using the mail API directly.', E_USER_DEPRECATED);
         /** @var MailMessage $mail */
         $mail = GeneralUtility::makeInstance(MailMessage::class);
         $senderName = trim($senderName);
@@ -5798,7 +5870,8 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @param array $prevId_array array of IDs from previous recursions. In order to prevent infinite loops with mount pages.
      * @param int $recursionLevel Internal: Zero for the first recursion, incremented for each recursive call.
      * @return string Returns the list of ids as a comma separated string
-     * @see TypoScriptFrontendController::checkEnableFields(), TypoScriptFrontendController::checkPagerecordForIncludeSection()
+     * @see TypoScriptFrontendController::checkEnableFields()
+     * @see TypoScriptFrontendController::checkPagerecordForIncludeSection()
      */
     public function getTreeList($id, $depth, $begin = 0, $dontCheckEnableFields = false, $addSelectFields = '', $moreWhereClauses = '', array $prevId_array = [], $recursionLevel = 0)
     {
@@ -6128,7 +6201,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
      * @throws \RuntimeException
      * @throws \InvalidArgumentException
      * @internal
-     * @see CONTENT(), numRows()
+     * @see numRows()
      */
     public function getQuery($table, $conf, $returnQueryArray = false)
     {
@@ -6358,7 +6431,7 @@ class ContentObjectRenderer implements LoggerAwareInterface
                 $tableReference,
                 $queryBuilder->getQueryPart('join'),
                 $knownAliases
-                );
+            );
         }
 
         $queryParts['SELECT'] = implode(', ', $queryBuilder->getQueryPart('select'));

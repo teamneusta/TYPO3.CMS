@@ -1,0 +1,13 @@
+/*
+ * This file is part of the TYPO3 CMS project.
+ *
+ * It is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License, either version 2
+ * of the License, or any later version.
+ *
+ * For the full copyright and license information, please read the
+ * LICENSE.txt file that was distributed with this source code.
+ *
+ * The TYPO3 project - inspiring people to share!
+ */
+define(["require","exports","../AbstractInteractableModule","jquery","../../Router","../../Renderable/InfoBox","../../Renderable/Severity","TYPO3/CMS/Backend/Modal","TYPO3/CMS/Backend/Notification","bootstrap"],function(e,t,s,r,n,a,i,o,c){"use strict";return new class extends s.AbstractInteractableModule{constructor(){super(...arguments),this.selectorExecuteTrigger=".t3js-imageProcessing-execute",this.selectorTestContainer=".t3js-imageProcessing-twinContainer",this.selectorTwinImageTemplate=".t3js-imageProcessing-twinImage-template",this.selectorCommandContainer=".t3js-imageProcessing-command",this.selectorCommandText=".t3js-imageProcessing-command-text",this.selectorTwinImages=".t3js-imageProcessing-images"}initialize(e){this.currentModal=e,this.getData(),e.on("click",this.selectorExecuteTrigger,e=>{e.preventDefault(),this.runTests()})}getData(){const e=this.getModalBody();r.ajax({url:n.getUrl("imageProcessingGetData"),cache:!1,success:t=>{!0===t.success?(e.empty().append(t.html),o.setButtons(t.buttons),this.runTests()):c.error("Something went wrong")},error:t=>{n.handleAjaxError(t,e)}})}runTests(){const e=this.getModalBody(),t=this.findInModal(this.selectorExecuteTrigger);t.addClass("disabled").prop("disabled",!0);const s=this.findInModal(this.selectorTwinImageTemplate),o=[];e.find(this.selectorTestContainer).each((t,c)=>{const l=r(c),d=l.data("test"),m=a.render(i.loading,"Loading...","");l.empty().html(m),o.push(r.ajax({url:n.getUrl(d),cache:!1,success:e=>{if(!0===e.success){l.empty(),Array.isArray(e.status)&&e.status.forEach(()=>{const e=a.render(c.severity,c.title,c.message);l.append(e)});const t=s.clone();if(t.removeClass("t3js-imageProcessing-twinImage-template"),!0===e.fileExists&&(t.find("img.reference").attr("src",e.referenceFile),t.find("img.result").attr("src",e.outputFile),t.find(this.selectorTwinImages).show()),Array.isArray(e.command)&&e.command.length>0){t.find(this.selectorCommandContainer).show();const s=[];e.command.forEach(e=>{s.push("<strong>Command:</strong>\n"+e[1]),3===e.length&&s.push("<strong>Result:</strong>\n"+e[2])}),t.find(this.selectorCommandText).html(s.join("\n"))}l.append(t)}},error:t=>{n.handleAjaxError(t,e)}}))}),r.when.apply(r,o).done(()=>{t.removeClass("disabled").prop("disabled",!1)})}}});

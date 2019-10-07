@@ -145,14 +145,14 @@ class FormRuntime implements RootRenderableInterface, \ArrayAccess
      *
      * @var SiteLanguage
      */
-    protected $currentSiteLanguage = null;
+    protected $currentSiteLanguage;
 
     /**
      * Reference to the current running finisher
      *
      * @var \TYPO3\CMS\Form\Domain\Finishers\FinisherInterface
      */
-    protected $currentFinisher = null;
+    protected $currentFinisher;
 
     /**
      * @param \TYPO3\CMS\Extbase\Security\Cryptography\HashService $hashService
@@ -418,8 +418,6 @@ class FormRuntime implements RootRenderableInterface, \ArrayAccess
             ->getPropertyFromAspect('frontend.user', 'isLoggedIn', false);
     }
 
-    /**
-     */
     protected function processVariants()
     {
         $conditionResolver = $this->getConditionResolver();
@@ -891,7 +889,7 @@ class FormRuntime implements RootRenderableInterface, \ArrayAccess
     }
 
     /**
-     * @return array<Page> The Form's pages in the correct order
+     * @return array|Page[] The Form's pages in the correct order
      */
     public function getPages(): array
     {

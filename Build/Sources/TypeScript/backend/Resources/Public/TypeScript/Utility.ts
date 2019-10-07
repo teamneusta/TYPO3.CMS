@@ -23,7 +23,7 @@ class Utility {
    * @return Array<string>
    */
   public static trimExplode(delimiter: string, string: string): Array<string> {
-    return string.split(delimiter).map((item) => item.trim()).filter((item) => item !== '');
+    return string.split(delimiter).map((item: string) => item.trim()).filter((item: string) => item !== '');
   }
 
   /**
@@ -35,7 +35,10 @@ class Utility {
    * @return Array<number>
    */
   public static intExplode(delimiter: string, string: string, excludeZeroValues: boolean = false): Array<number> {
-    return string.split(delimiter).map((item) => parseInt(item, 10)).filter((item) => !isNaN(item) || excludeZeroValues && item === 0);
+    return string
+      .split(delimiter)
+      .map((item: string) => parseInt(item, 10))
+      .filter((item: number) => !isNaN(item) || excludeZeroValues && item === 0);
   }
 
   /**
@@ -91,12 +94,26 @@ class Utility {
    */
   public static updateQueryStringParameter(url: string, key: string, value: string): string {
     const re = new RegExp('([?&])' + key + '=.*?(&|$)', 'i');
-    const separator = url.indexOf('?') !== -1 ? '&' : '?';
+    const separator = url.includes('?') ? '&' : '?';
 
     if (url.match(re)) {
       return url.replace(re, '$1' + key + '=' + value + '$2');
     }
     return url + separator + key + '=' + value;
+  }
+
+  public static convertFormToObject(form: HTMLFormElement): { [key: string]: any } {
+    const obj: { [key: string]: any } = {};
+    form.querySelectorAll('input, select, textarea').forEach((element: HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement): void => {
+      const name = element.name;
+      const value = element.value;
+
+      if (name) {
+        obj[name] = value;
+      }
+    });
+
+    return obj;
   }
 }
 

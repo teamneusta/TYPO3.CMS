@@ -16,9 +16,11 @@ namespace TYPO3\CMS\Fluid\Tests\Functional\ViewHelpers;
  */
 
 use TYPO3\CMS\Core\Tests\Functional\SiteHandling\SiteBasedTestTrait;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
+use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
-class TypolinkViewHelperTest extends \TYPO3\TestingFramework\Core\Functional\FunctionalTestCase
+class TypolinkViewHelperTest extends FunctionalTestCase
 {
     use SiteBasedTestTrait;
 
@@ -64,6 +66,9 @@ class TypolinkViewHelperTest extends \TYPO3\TestingFramework\Core\Functional\Fun
             'foo' => 'bar',
             'temp' => 'test',
         ];
+        $_SERVER['HTTP_HOST'] = 'example.com';
+        $_SERVER['REQUEST_URI'] = '/en/';
+        GeneralUtility::flushInternalRuntimeCaches();
     }
 
     /**
@@ -121,13 +126,6 @@ class TypolinkViewHelperTest extends \TYPO3\TestingFramework\Core\Functional\Fun
                 'expected' => '<a href="/en/?foo=bar&amp;cHash=afa4b37588ab917af3cfe2cd4464029d">This is a testlink</a> <a href="/en/">This is a testlink</a>',
                 'template' => 'link_typolink_viewhelper',
             ],
-            'link: with add query string and method POST' => [
-                'addQueryString' => true,
-                'addQueryStringMethod' => 'POST',
-                'addQueryStringExclude' => 'temp',
-                'expected' => '<a href="/en/">This is a testlink</a> <a href="/en/">This is a testlink</a>',
-                'template' => 'link_typolink_viewhelper',
-            ],
             'uri: default' => [
                 'addQueryString' => false,
                 'addQueryStringMethod' => 'GET',
@@ -147,13 +145,6 @@ class TypolinkViewHelperTest extends \TYPO3\TestingFramework\Core\Functional\Fun
                 'addQueryStringMethod' => 'GET',
                 'addQueryStringExclude' => 'temp',
                 'expected' => '/en/?foo=bar&amp;cHash=afa4b37588ab917af3cfe2cd4464029d /en/',
-                'template' => 'uri_typolink_viewhelper',
-            ],
-            'uri: with add query string and method POST' => [
-                'addQueryString' => true,
-                'addQueryStringMethod' => 'POST',
-                'addQueryStringExclude' => 'temp',
-                'expected' => '/en/ /en/',
                 'template' => 'uri_typolink_viewhelper',
             ],
         ];

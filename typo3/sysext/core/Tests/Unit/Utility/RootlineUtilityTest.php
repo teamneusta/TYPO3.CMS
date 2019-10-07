@@ -22,9 +22,9 @@ use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Context\LanguageAspect;
 use TYPO3\CMS\Core\Context\WorkspaceAspect;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\RootlineUtility;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 use TYPO3\TestingFramework\Core\AccessibleObjectInterface;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
@@ -59,9 +59,6 @@ class RootlineUtilityTest extends UnitTestCase
         $this->subject->expects(static::any())->method('resolvePageId')->willReturnArgument(0);
     }
 
-    /**
-     *
-     */
     protected function tearDown(): void
     {
         RootlineUtility::purgeCaches();
@@ -73,7 +70,7 @@ class RootlineUtilityTest extends UnitTestCase
      * Tests that $subsetCandidate is completely part of $superset
      * and keys match.
      *
-     * @see (A ^ B) = A <=> A c B
+     * See (A ^ B) = A <=> A c B
      * @param array $subsetCandidate
      * @param array $superset
      */

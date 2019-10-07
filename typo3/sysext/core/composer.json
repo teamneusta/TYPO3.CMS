@@ -25,8 +25,11 @@
 		"doctrine/instantiator": "^1.1",
 		"doctrine/lexer": "^1.0",
 		"guzzlehttp/guzzle": "^6.3.0",
-		"nikic/php-parser": "^4.0",
+		"nikic/php-parser": "^4.2",
 		"psr/container": "^1.0",
+		"psr/event-dispatcher": "^1.0",
+		"psr/http-client": "^1.0",
+		"psr/http-factory": "^1.0",
 		"psr/http-message": "~1.0",
 		"psr/http-server-handler": "^1.0",
 		"psr/http-server-middleware": "^1.0",
@@ -35,7 +38,7 @@
 		"symfony/console": "^4.1",
 		"symfony/dependency-injection": "^4.1",
 		"symfony/expression-language": "^4.1",
-		"symfony/finder": "^4.1",
+		"symfony/finder": "^4.3",
 		"symfony/mailer": "^4.3",
 		"symfony/mime": "^4.3",
 		"symfony/polyfill-intl-icu": "^1.6",
@@ -47,14 +50,14 @@
 		"typo3/cms-cli": "^2.0",
 		"typo3/cms-composer-installers": "^2.0",
 		"typo3/phar-stream-wrapper": "^3.1.2",
-		"typo3fluid/fluid": "^2.6.1"
+		"typo3fluid/fluid": "^2.6.4"
 	},
 	"require-dev": {
 		"codeception/codeception": "^2.5.4 || ^3",
-		"friendsofphp/php-cs-fixer": "^2.12.2",
+		"friendsofphp/php-cs-fixer": "^2.15.2",
 		"phpspec/prophecy": "^1.7.5",
 		"typo3/cms-styleguide": "~10.0.2",
-		"typo3/testing-framework": "~5.0.10"
+		"typo3/testing-framework": "~5.0.14"
 	},
 	"suggest": {
 		"ext-fileinfo": "Used for proper file type detection in the file abstraction layer",
@@ -77,9 +80,14 @@
 		"typo3/cms-saltedpasswords": "*",
 		"typo3/cms-sv": "*"
 	},
+	"provide": {
+		"psr/http-client-implementation": "1.0",
+		"psr/http-factory-implementation": "1.0",
+		"psr/http-message-implementation": "1.0"
+	},
 	"extra": {
 		"branch-alias": {
-			"dev-master": "10.0.x-dev"
+			"dev-master": "10.2.x-dev"
 		},
 		"typo3/cms": {
 			"Package": {
@@ -89,6 +97,11 @@
 				"partOfMinimalUsableSystem": true
 			},
 			"extension-key": "core"
+		},
+		"typo3/class-alias-loader": {
+			"class-alias-maps": [
+				"Migrations/Code/ClassAliasMap.php"
+			]
 		}
 	},
 	"autoload": {

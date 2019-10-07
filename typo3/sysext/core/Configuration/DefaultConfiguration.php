@@ -243,6 +243,11 @@ return [
                     'filterHiddenFilesAndFolders'
                 ]
             ],
+            'processors' => [
+                'LocalImageProcessor' => [
+                    'className' => \TYPO3\CMS\Core\Resource\Processing\LocalImageProcessor::class,
+                ],
+            ],
             'processingTaskTypes' => [
                 'Image.Preview' => \TYPO3\CMS\Core\Resource\Processing\ImagePreviewTask::class,
                 'Image.CropScaleMask' => \TYPO3\CMS\Core\Resource\Processing\ImageCropScaleMaskTask::class
@@ -381,18 +386,13 @@ return [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\PageTsConfig::class,
                         ],
                     ],
-                    \TYPO3\CMS\Backend\Form\FormDataProvider\ParentPageTca::class => [
-                        'depends' => [
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\InlineOverrideChildTca::class
-                        ],
-                    ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseRowInitializeNew::class => [
                         'depends' => [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseUserPermissionCheck::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\UserTsConfig::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\PageTsConfig::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\InitializeProcessedTca::class,
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\ParentPageTca::class,
+                            \TYPO3\CMS\Backend\Form\FormDataProvider\InlineOverrideChildTca::class,
                         ],
                     ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseUniqueUidNewRow::class => [
@@ -635,17 +635,11 @@ return [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\UserTsConfig::class
                         ],
                     ],
-                    \TYPO3\CMS\Backend\Form\FormDataProvider\ParentPageTca::class => [
-                        'depends' => [
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\PageTsConfig::class,
-                        ],
-                    ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseRowInitializeNew::class => [
                         'depends' => [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseUserPermissionCheck::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\UserTsConfig::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\PageTsConfig::class,
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\ParentPageTca::class,
                         ],
                     ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseUniqueUidNewRow::class => [
@@ -886,18 +880,13 @@ return [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\PageTsConfig::class,
                         ],
                     ],
-                    \TYPO3\CMS\Backend\Form\FormDataProvider\ParentPageTca::class => [
-                        'depends' => [
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\InlineOverrideChildTca::class
-                        ],
-                    ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseRowInitializeNew::class => [
                         'depends' => [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseUserPermissionCheck::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\UserTsConfig::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\PageTsConfig::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\InitializeProcessedTca::class,
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\ParentPageTca::class,
+                            \TYPO3\CMS\Backend\Form\FormDataProvider\InlineOverrideChildTca::class,
                         ],
                     ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseUniqueUidNewRow::class => [
@@ -1084,6 +1073,7 @@ return [
         'warning_email_addr' => '',
         'warning_mode' => 0,
         'lockIP' => 4,
+        'lockIPv6' => 2,
         'sessionTimeout' => 28800,  // a backend user logged in for 8 hours
         'IPmaskList' => '',
         'lockBeUserToDBmounts' => true,
@@ -1264,6 +1254,7 @@ return [
         'addRootLineFields' => '',
         'checkFeUserPid' => true,
         'lockIP' => 2,
+        'lockIPv6' => 2,
         'loginSecurityLevel' => 'normal',
         'lifetime' => 0,
         'sessionTimeout' => 6000,
@@ -1338,6 +1329,7 @@ return [
         'timeout' => 0,
         'verify' => true,
         'version' => '1.1',
+        'handler' => [], // Array of callables
         'headers' => [ // Additional HTTP headers sent by every request TYPO3 executes.
             'User-Agent' => 'TYPO3' // String: Default user agent. Defaults to TYPO3.
         ]

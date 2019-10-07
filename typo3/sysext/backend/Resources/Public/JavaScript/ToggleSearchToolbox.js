@@ -10,4 +10,4 @@
  *
  * The TYPO3 project - inspiring people to share!
  */
-define(["require","exports","jquery","./DocumentHeader","TYPO3/CMS/Backend/jquery.clearable"],function(e,i,t,o){"use strict";return new(function(){function e(){var e=this;t(function(){e.initialize()})}return e.prototype.initialize=function(){var e=this,i=t("#db_list-searchbox-toolbar");t(".t3js-toggle-search-toolbox").on("click",function(){i.toggle(),o.reposition(),i.is(":visible")&&t("#search_field").focus()});var n=t("#search_field"),r=""!==n.val();n.clearable({onClear:function(){r&&t(e).closest("form").submit()}})},e}())});
+define(["require","exports","jquery","./DocumentHeader","TYPO3/CMS/Backend/Input/Clearable"],function(e,t,i,o){"use strict";return new class{constructor(){i(()=>{this.initialize()})}initialize(){const e=i("#db_list-searchbox-toolbar");let t;if(i(".t3js-toggle-search-toolbox").on("click",()=>{e.toggle(),o.reposition(),e.is(":visible")&&i("#search_field").focus()}),null!==(t=document.querySelector("#search_field"))){const e=""!==t.value;t.clearable({onClear:t=>{e&&t.closest("form").submit()}})}}}});

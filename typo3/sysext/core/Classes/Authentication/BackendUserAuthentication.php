@@ -298,7 +298,6 @@ class BackendUserAuthentication extends AbstractUserAuthentication
     {
         $this->name = self::getCookieName();
         $this->warningEmail = $GLOBALS['TYPO3_CONF_VARS']['BE']['warning_email_addr'];
-        $this->lockIP = $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIP'];
         $this->sessionTimeout = (int)$GLOBALS['TYPO3_CONF_VARS']['BE']['sessionTimeout'];
         parent::__construct();
     }
@@ -378,11 +377,11 @@ class BackendUserAuthentication extends AbstractUserAuthentication
         $checkRec = BackendUtility::getRecord(
             'pages',
             $id,
-            'pid,t3ver_oid,'
+            't3ver_oid,'
             . $GLOBALS['TCA']['pages']['ctrl']['transOrigPointerField'] . ','
             . $GLOBALS['TCA']['pages']['ctrl']['languageField']
         );
-        if ($checkRec['pid'] == -1) {
+        if ((int)$checkRec['t3ver_oid'] > 0) {
             $id = (int)$checkRec['t3ver_oid'];
         }
         // if current rec is a translation then get uid from l10n_parent instead
@@ -440,7 +439,7 @@ class BackendUserAuthentication extends AbstractUserAuthentication
         }
         // If $conf['access'] is set but not with 'admin' then we return TRUE, if the module is found in the modList
         $acs = false;
-        if (!strstr($conf['access'], 'admin') && $conf['name']) {
+        if (strpos($conf['access'], 'admin') === false && $conf['name']) {
             $acs = $this->check('modules', $conf['name']);
         }
         if (!$acs) {
@@ -886,58 +885,50 @@ class BackendUserAuthentication extends AbstractUserAuthentication
     /**
      * Checking if editing of an existing record is allowed in current workspace if that is offline.
      * Rules for editing in offline mode:
-     * - record supports versioning and is an offline version from workspace and has the corrent stage
+     * - record supports versioning and is an offline version from workspace and has the current stage
      * - or record (any) is in a branch where there is a page which is a version from the workspace
      *   and where the stage is not preventing records
      *
      * @param string $table Table of record
-     * @param array|int $recData Integer (record uid) or array where fields are at least: pid, t3ver_wsid, t3ver_stage (if versioningWS is set)
+     * @param array|int $recData Integer (record uid) or array where fields are at least: pid, t3ver_wsid, t3ver_oid, t3ver_stage (if versioningWS is set)
      * @return string String error code, telling the failure state. FALSE=All ok
      */
     public function workspaceCannotEditRecord($table, $recData)
     {
-        // Only test offline spaces:
-        if ($this->workspace !== 0) {
-            if (!is_array($recData)) {
-                $recData = BackendUtility::getRecord(
-                    $table,
-                    $recData,
-                    'pid' . ($GLOBALS['TCA'][$table]['ctrl']['versioningWS'] ? ',t3ver_wsid,t3ver_stage' : '')
-                );
-            }
-            if (is_array($recData)) {
-                // We are testing a "version" (identified by a pid of -1): it can be edited provided
-                // that workspace matches and versioning is enabled for the table.
-                if ((int)$recData['pid'] === -1) {
-                    // No versioning, basic error, inconsistency even! Such records should not have a pid of -1!
-                    if (!$GLOBALS['TCA'][$table]['ctrl']['versioningWS']) {
-                        return 'Versioning disabled for table';
-                    }
-                    if ((int)$recData['t3ver_wsid'] !== $this->workspace) {
-                        // So does workspace match?
-                        return 'Workspace ID of record didn\'t match current workspace';
-                    }
-                    // So is the user allowed to "use" the edit stage within the workspace?
-                    return $this->workspaceCheckStageForCurrent(0)
-                            ? false
-                            : 'User\'s access level did not allow for editing';
-                }
-                // We are testing a "live" record:
-                // For "Live" records, check that PID for table allows editing
-                if ($res = $this->workspaceAllowLiveRecordsInPID($recData['pid'], $table)) {
-                    // Live records are OK in this branch, but what about the stage of branch point, if any:
-                    // OK
-                    return $res > 0
-                            ? false
-                            : 'Stage for versioning root point and users access level did not allow for editing';
-                }
-                // If not offline and not in versionized branch, output error:
-                return 'Online record was not in versionized branch!';
-            }
-            return 'No record';
+        // Only test if the user is in a workspace
+        if ($this->workspace === 0) {
+            return false;
         }
-        // OK because workspace is 0
-        return false;
+        $tableSupportsVersioning = BackendUtility::isTableWorkspaceEnabled($table);
+        if (!is_array($recData)) {
+            $recData = BackendUtility::getRecord(
+                $table,
+                $recData,
+                'pid' . ($tableSupportsVersioning ? ',t3ver_oid,t3ver_wsid,t3ver_stage' : '')
+            );
+        }
+        if (is_array($recData)) {
+            // We are testing a "version" (identified by having a t3ver_oid): it can be edited provided
+            // that workspace matches and versioning is enabled for the table.
+            if ($tableSupportsVersioning && (int)($recData['t3ver_oid'] ?? 0) > 0) {
+                if ((int)$recData['t3ver_wsid'] !== $this->workspace) {
+                    // So does workspace match?
+                    return 'Workspace ID of record didn\'t match current workspace';
+                }
+                // So is the user allowed to "use" the edit stage within the workspace?
+                return $this->workspaceCheckStageForCurrent(0)
+                        ? false
+                        : 'User\'s access level did not allow for editing';
+            }
+            // Check if we are testing a "live" record
+            if ($this->workspaceAllowsLiveEditingInTable($table)) {
+                // Live records are OK in the current workspace
+                return false;
+            }
+            // If not offline, output error
+            return 'Online record was not in a workspace!';
+        }
+        return 'No record';
     }
 
     /**
@@ -951,19 +942,19 @@ class BackendUserAuthentication extends AbstractUserAuthentication
      */
     public function workspaceCannotEditOfflineVersion($table, $recData)
     {
-        if ($GLOBALS['TCA'][$table]['ctrl']['versioningWS']) {
-            if (!is_array($recData)) {
-                $recData = BackendUtility::getRecord($table, $recData, 'uid,pid,t3ver_wsid,t3ver_stage');
-            }
-            if (is_array($recData)) {
-                if ((int)$recData['pid'] === -1) {
-                    return $this->workspaceCannotEditRecord($table, $recData);
-                }
-                return 'Not an offline version';
-            }
-            return 'No record';
+        if (!BackendUtility::isTableWorkspaceEnabled($table)) {
+            return 'Table does not support versioning.';
         }
-        return 'Table does not support versioning.';
+        if (!is_array($recData)) {
+            $recData = BackendUtility::getRecord($table, $recData, 'uid,pid,t3ver_oid,t3ver_wsid,t3ver_stage');
+        }
+        if (is_array($recData)) {
+            if ((int)$recData['t3ver_oid'] > 0) {
+                return $this->workspaceCannotEditRecord($table, $recData);
+            }
+            return 'Not an offline version';
+        }
+        return 'No record';
     }
 
     /**
@@ -972,6 +963,8 @@ class BackendUserAuthentication extends AbstractUserAuthentication
      * If the answer is 1 or 2 it means it is OK to create a record, if -1 it means that it is OK in terms
      * of versioning because the element was within a versionized branch
      * but NOT ok in terms of the state the root point had!
+     *
+     * Note: this method is not in use anymore and will likely be deprecated in future TYPO3 versions.
      *
      * @param int $pid PID value to check for. OBSOLETE!
      * @param string $table Table name
@@ -983,7 +976,7 @@ class BackendUserAuthentication extends AbstractUserAuthentication
         // and tables are completely without versioning it is ok as well.
         if (
             $this->workspace === 0
-            || $this->workspaceRec['live_edit'] && !$GLOBALS['TCA'][$table]['ctrl']['versioningWS']
+            || $this->workspaceRec['live_edit'] && !BackendUtility::isTableWorkspaceEnabled($table)
             || $GLOBALS['TCA'][$table]['ctrl']['versioningWS_alwaysAllowLiveEdit']
         ) {
             // OK to create for this table.
@@ -994,7 +987,36 @@ class BackendUserAuthentication extends AbstractUserAuthentication
     }
 
     /**
+     * Checks if a record is allowed to be edited in the current workspace.
+     * This is not bound to an actual record, but to the mere fact if the user is in a workspace
+     * and depending on the table settings.
+     *
+     * @param string $table
+     * @return bool
+     */
+    public function workspaceAllowsLiveEditingInTable(string $table): bool
+    {
+        // In live workspace the record can be added/modified
+        if ($this->workspace === 0) {
+            return true;
+        }
+        // Workspace setting allows to "live edit" records of tables without versioning
+        if ($this->workspaceRec['live_edit'] && !BackendUtility::isTableWorkspaceEnabled($table)) {
+            return true;
+        }
+        // Always for Live workspace AND if live-edit is enabled
+        // and tables are completely without versioning it is ok as well.
+        if ($GLOBALS['TCA'][$table]['ctrl']['versioningWS_alwaysAllowLiveEdit']) {
+            return true;
+        }
+        // If the answer is FALSE it means the only valid way to create or edit records by creating records in the workspace
+        return false;
+    }
+
+    /**
      * Evaluates if a record from $table can be created in $pid
+     *
+     * Note: this method is not in use anymore and will likely be deprecated in future TYPO3 versions.
      *
      * @param int $pid Page id. This value must be the _ORIG_uid if available: So when you have pages versionized as "page" or "element" you must supply the id of the page version in the workspace!
      * @param string $table Table name
@@ -1002,14 +1024,26 @@ class BackendUserAuthentication extends AbstractUserAuthentication
      */
     public function workspaceCreateNewRecord($pid, $table)
     {
-        if ($res = $this->workspaceAllowLiveRecordsInPID($pid, $table)) {
-            // If LIVE records cannot be created in the current PID due to workspace restrictions, prepare creation of placeholder-record
-            if ($res < 0) {
-                // Stage for versioning root point and users access level did not allow for editing
-                return false;
-            }
-        } elseif (!$GLOBALS['TCA'][$table]['ctrl']['versioningWS']) {
-            // So, if no live records were allowed, we have to create a new version of this record:
+        // If LIVE records cannot be created due to workspace restrictions, prepare creation of placeholder-record
+        if (!$this->workspaceAllowsLiveEditingInTable($table) && !BackendUtility::isTableWorkspaceEnabled($table)) {
+            // So, if no live records were allowed, we have to create a new version of this record
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Evaluates if a record from $table can be created. If the table is not set up for versioning,
+     * and the "live edit" flag of the page is set, return false. In live workspace this is always true,
+     * as all records can be created in live workspace
+     *
+     * @param string $table Table name
+     * @return bool
+     */
+    public function workspaceCanCreateNewRecord(string $table): bool
+    {
+        // If LIVE records cannot be created due to workspace restrictions, prepare creation of placeholder-record
+        if (!$this->workspaceAllowsLiveEditingInTable($table) && !BackendUtility::isTableWorkspaceEnabled($table)) {
             return false;
         }
         return true;
@@ -1017,6 +1051,9 @@ class BackendUserAuthentication extends AbstractUserAuthentication
 
     /**
      * Evaluates if auto creation of a version of a record is allowed.
+     * Auto-creation of version: In offline workspace, test if versioning is
+     * enabled and look for workspace version of input record.
+     * If there is no versionized record found we will create one and save to that.
      *
      * @param string $table Table of the record
      * @param int $id UID of record
@@ -1025,18 +1062,22 @@ class BackendUserAuthentication extends AbstractUserAuthentication
      */
     public function workspaceAllowAutoCreation($table, $id, $recpid)
     {
-        // Auto-creation of version: In offline workspace, test if versioning is
-        // enabled and look for workspace version of input record.
-        // If there is no versionized record found we will create one and save to that.
-        if (
-            $this->workspace !== 0
-            && $GLOBALS['TCA'][$table]['ctrl']['versioningWS'] && $recpid >= 0
-            && !BackendUtility::getWorkspaceVersionOfRecord($this->workspace, $table, $id, 'uid')
-        ) {
-            // There must be no existing version of this record in workspace.
-            return true;
+        // No version can be created in live workspace
+        if ($this->workspace === 0) {
+            return false;
         }
-        return false;
+        // No versioning support for this table, so no version can be created
+        if (!BackendUtility::isTableWorkspaceEnabled($table)) {
+            return false;
+        }
+        if ($recpid < 0) {
+            return false;
+        }
+        // There must be no existing version of this record in workspace
+        if (BackendUtility::getWorkspaceVersionOfRecord($this->workspace, $table, $id, 'uid')) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -1054,49 +1095,46 @@ class BackendUserAuthentication extends AbstractUserAuthentication
         if ($this->isAdmin()) {
             return true;
         }
-        if ($this->workspace !== 0 && ExtensionManagementUtility::isLoaded('workspaces')) {
-            $stage = (int)$stage;
-            $stat = $this->checkWorkspaceCurrent();
-            // Check if custom staging is activated
-            $workspaceRec = BackendUtility::getRecord('sys_workspace', $stat['uid']);
-            if ($workspaceRec['custom_stages'] > 0 && $stage !== 0 && $stage !== -10) {
-                // Get custom stage record
-                $workspaceStageRec = BackendUtility::getRecord('sys_workspace_stage', $stage);
-                // Check if the user is responsible for the current stage
+        // Always OK for live workspace
+        if ($this->workspace === 0 || !ExtensionManagementUtility::isLoaded('workspaces')) {
+            return true;
+        }
+        $stage = (int)$stage;
+        $stat = $this->checkWorkspaceCurrent();
+        $accessType = $stat['_ACCESS'];
+        // Workspace owners are always allowed for stage change
+        if ($accessType === 'owner') {
+            return true;
+        }
+
+        // Check if custom staging is activated
+        $workspaceRec = BackendUtility::getRecord('sys_workspace', $stat['uid']);
+        if ($workspaceRec['custom_stages'] > 0 && $stage !== 0 && $stage !== -10) {
+            // Get custom stage record
+            $workspaceStageRec = BackendUtility::getRecord('sys_workspace_stage', $stage);
+            // Check if the user is responsible for the current stage
+            if (
+                $accessType === 'member'
+                && GeneralUtility::inList($workspaceStageRec['responsible_persons'], 'be_users_' . $this->user['uid'])
+            ) {
+                return true;
+            }
+            // Check if the user is in a group which is responsible for the current stage
+            foreach ($this->userGroupsUID as $groupUid) {
                 if (
-                    $stat['_ACCESS'] === 'owner'
-                    || $stat['_ACCESS'] === 'member'
-                    && GeneralUtility::inList($workspaceStageRec['responsible_persons'], 'be_users_' . $this->user['uid'])
-                ) {
-                    return true;
-                }
-                // Check if the user is in a group which is responsible for the current stage
-                foreach ($this->userGroupsUID as $groupUid) {
-                    if (
-                        $stat['_ACCESS'] === 'owner'
-                        || $stat['_ACCESS'] === 'member'
-                        && GeneralUtility::inList($workspaceStageRec['responsible_persons'], 'be_groups_' . $groupUid)
-                    ) {
-                        return true;
-                    }
-                }
-            } elseif ($stage == -10 || $stage == -20) {
-                if ($stat['_ACCESS'] === 'owner') {
-                    return true;
-                }
-                return false;
-            } else {
-                $memberStageLimit = $this->workspaceRec['review_stage_edit'] ? 1 : 0;
-                if (
-                    $stat['_ACCESS'] === 'owner'
-                    || $stat['_ACCESS'] === 'reviewer' && $stage <= 1
-                    || $stat['_ACCESS'] === 'member' && $stage <= $memberStageLimit
+                    $accessType === 'member'
+                    && GeneralUtility::inList($workspaceStageRec['responsible_persons'], 'be_groups_' . $groupUid)
                 ) {
                     return true;
                 }
             }
-        } else {
-            // Always OK for live workspace.
+        } elseif ($stage === -10 || $stage === -20) {
+            // Nobody is allowed to do that except the owner (which was checked above)
+            return false;
+        } elseif (
+            $accessType === 'reviewer' && $stage <= 1
+            || $accessType === 'member' && $stage <= 0
+        ) {
             return true;
         }
         return false;
@@ -1118,25 +1156,23 @@ class BackendUserAuthentication extends AbstractUserAuthentication
         if ($this->isAdmin()) {
             return true;
         }
-        // If no access to workspace, of course you cannot publish!
-        $retVal = false;
         $wsAccess = $this->checkWorkspace($wsid);
-        if ($wsAccess) {
-            switch ($wsAccess['uid']) {
-                case 0:
-                    // Live workspace
-                    // If access to Live workspace, no problem.
-                    $retVal = true;
-                    break;
-                default:
-                    // Custom workspace
-                    $retVal = $wsAccess['_ACCESS'] === 'owner' || $this->checkWorkspace(0) && !($wsAccess['publish_access'] & Permission::PAGE_EDIT);
-                    // Either be an adminuser OR have access to online
-                    // workspace which is OK as well as long as publishing
-                    // access is not limited by workspace option.
-            }
+        // If no access to workspace, of course you cannot publish!
+        if ($wsAccess === false) {
+            return false;
         }
-        return $retVal;
+        if ((int)$wsAccess['uid'] === 0) {
+            // If access to Live workspace, no problem.
+            return true;
+        }
+        // Custom workspaces
+        // 1. Owners can always publish
+        if ($wsAccess['_ACCESS'] === 'owner') {
+            return true;
+        }
+        // 2. User has access to online workspace which is OK as well as long as publishing
+        // access is not limited by workspace option.
+        return $this->checkWorkspace(0) && !($wsAccess['publish_access'] & 2);
     }
 
     /**
@@ -1147,10 +1183,15 @@ class BackendUserAuthentication extends AbstractUserAuthentication
      */
     public function workspaceSwapAccess()
     {
-        if ($this->workspace > 0 && (int)$this->workspaceRec['swap_modes'] === 2) {
-            return false;
+        // Always possible in live workspace
+        if ($this->workspace === 0) {
+            return true;
         }
-        return true;
+        // In custom workspaces, only possible if swap_modes flag is not "2" (explicitly disabling swapping)
+        if ((int)$this->workspaceRec['swap_modes'] !== 2) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -1927,7 +1968,7 @@ class BackendUserAuthentication extends AbstractUserAuthentication
      * of the user is used.
      *
      * @return \TYPO3\CMS\Core\Resource\Folder|null
-     * @see \TYPO3\CMS\Core\Authentication\BackendUserAuthentication::getDefaultUploadFolder();
+     * @see \TYPO3\CMS\Core\Authentication\BackendUserAuthentication::getDefaultUploadFolder()
      */
     public function getDefaultUploadTemporaryFolder()
     {
@@ -2000,10 +2041,10 @@ class BackendUserAuthentication extends AbstractUserAuthentication
      * Checking if a workspace is allowed for backend user
      *
      * @param mixed $wsRec If integer, workspace record is looked up, if array it is seen as a Workspace record with at least uid, title, members and adminusers columns. Can be faked for workspaces uid 0 and -1 (online and offline)
-     * @param string $fields List of fields to select. Default fields are: uid,title,adminusers,members,reviewers,publish_access,stagechg_notification
+     * @param string $fields List of fields to select. Default fields are all
      * @return array Output will also show how access was granted. Admin users will have a true output regardless of input.
      */
-    public function checkWorkspace($wsRec, $fields = 'uid,title,adminusers,members,reviewers,publish_access,stagechg_notification')
+    public function checkWorkspace($wsRec, $fields = '*')
     {
         $retVal = false;
         // If not array, look up workspace record:
@@ -2049,16 +2090,6 @@ class BackendUserAuthentication extends AbstractUserAuthentication
                         foreach ($this->userGroupsUID as $groupUid) {
                             if (GeneralUtility::inList($wsRec['adminusers'], 'be_groups_' . $groupUid)) {
                                 return array_merge($wsRec, ['_ACCESS' => 'owner']);
-                            }
-                        }
-                        // Checking if he is reviewer user:
-                        if (GeneralUtility::inList($wsRec['reviewers'], 'be_users_' . $this->user['uid'])) {
-                            return array_merge($wsRec, ['_ACCESS' => 'reviewer']);
-                        }
-                        // Checking if he is reviewer through a user group of his:
-                        foreach ($this->userGroupsUID as $groupUid) {
-                            if (GeneralUtility::inList($wsRec['reviewers'], 'be_groups_' . $groupUid)) {
-                                return array_merge($wsRec, ['_ACCESS' => 'reviewer']);
                             }
                         }
                         // Checking if he is member as user:
@@ -2125,7 +2156,7 @@ class BackendUserAuthentication extends AbstractUserAuthentication
     public function setTemporaryWorkspace($workspaceId)
     {
         $result = false;
-        $workspaceRecord = $this->checkWorkspace($workspaceId, '*');
+        $workspaceRecord = $this->checkWorkspace($workspaceId);
 
         if ($workspaceRecord) {
             $this->workspaceRec = $workspaceRecord;
@@ -2142,7 +2173,7 @@ class BackendUserAuthentication extends AbstractUserAuthentication
     public function setDefaultWorkspace()
     {
         $this->workspace = (int)$this->getDefaultWorkspace();
-        $this->workspaceRec = $this->checkWorkspace($this->workspace, '*');
+        $this->workspaceRec = $this->checkWorkspace($this->workspace);
     }
 
     /**
@@ -2336,12 +2367,11 @@ This is a dump of the failures:
                     $email_body .= date(
                         $GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'] . ' ' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['hhmm'],
                         $row['tstamp']
-                        ) . ':  ' . @sprintf($row['details'], (string)$theData[0], (string)$theData[1], (string)$theData[2]);
+                    ) . ':  ' . @sprintf($row['details'], (string)$theData[0], (string)$theData[1], (string)$theData[2]);
                     $email_body .= LF;
                 }
-                /** @var \TYPO3\CMS\Core\Mail\MailMessage $mail */
                 $mail = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Mail\MailMessage::class);
-                $mail->setTo($email)->setSubject($subject)->setBody($email_body);
+                $mail->setTo($email)->subject($subject)->text($email_body);
                 $mail->send();
                 // Logout written to log
                 $this->writelog(255, 4, 0, 3, 'Failure warning (%s failures within %s seconds) sent by email to %s', [$rowCount, $secondsBack, $email]);

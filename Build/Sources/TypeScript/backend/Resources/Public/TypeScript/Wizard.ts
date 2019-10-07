@@ -156,6 +156,10 @@ class Wizard {
     return $button;
   }
 
+  public setForceSelection(force: boolean): void {
+    this.setup.forceSelection = force;
+  }
+
   private initializeEvents(): void {
     let $modal = this.setup.$carousel.closest('.modal');
     let $modalTitle = $modal.find('.modal-title');
@@ -269,8 +273,7 @@ class Wizard {
     let slides = '<div class="carousel slide" data-ride="carousel" data-interval="false">'
       + '<div class="carousel-inner" role="listbox">';
 
-    for (let i = 0; i < this.setup.slides.length; ++i) {
-      let currentSlide: Slide = this.setup.slides[i];
+    for (let currentSlide of Object.values(this.setup.slides)) {
       let slideContent = currentSlide.content;
 
       if (typeof slideContent === 'object') {
@@ -288,7 +291,7 @@ class Wizard {
   }
 }
 
-let wizardObject;
+let wizardObject: any;
 try {
   // fetch from opening window
   if (window.opener && window.opener.TYPO3 && window.opener.TYPO3.Wizard) {
@@ -304,7 +307,7 @@ try {
   if (top && top.TYPO3 && top.TYPO3.Wizard) {
     wizardObject = top.TYPO3.Wizard;
   }
-} catch (e) {
+} catch {
   // This only happens if the opener, parent or top is some other url (eg a local file)
   // which loaded the current window. Then the browser's cross domain policy jumps in
   // and raises an exception.

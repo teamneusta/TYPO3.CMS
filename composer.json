@@ -43,9 +43,12 @@
 		"doctrine/instantiator": "^1.1",
 		"doctrine/lexer": "^1.0",
 		"guzzlehttp/guzzle": "^6.3.0",
-		"nikic/php-parser": "^4.0",
+		"nikic/php-parser": "^4.2",
 		"phpdocumentor/reflection-docblock": "^4.3",
 		"psr/container": "^1.0",
+		"psr/event-dispatcher": "^1.0",
+		"psr/http-client": "^1.0",
+		"psr/http-factory": "^1.0",
 		"psr/http-message": "~1.0",
 		"psr/http-server-middleware": "^1.0",
 		"psr/log": "~1.0.0",
@@ -53,7 +56,7 @@
 		"symfony/console": "^4.1",
 		"symfony/dependency-injection": "^4.1",
 		"symfony/expression-language": "^4.1",
-		"symfony/finder": "^4.1",
+		"symfony/finder": "^4.3",
 		"symfony/mailer": "^4.3",
 		"symfony/mime": "^4.3",
 		"symfony/polyfill-intl-icu": "^1.6",
@@ -67,15 +70,15 @@
 		"typo3/cms-cli": "^2.0",
 		"typo3/cms-composer-installers": "^2.0",
 		"typo3/phar-stream-wrapper": "^3.1.2",
-		"typo3fluid/fluid": "^2.6.1",
+		"typo3fluid/fluid": "^2.6.4",
 		"webmozart/assert": "^1.0"
 	},
 	"require-dev": {
 		"codeception/codeception": "^2.5.4 || ^3",
-		"friendsofphp/php-cs-fixer": "^2.12.2",
+		"friendsofphp/php-cs-fixer": "^2.15.2",
 		"phpspec/prophecy": "^1.7.5",
 		"typo3/cms-styleguide": "~10.0.2",
-		"typo3/testing-framework": "~5.0.10"
+		"typo3/testing-framework": "~5.0.14"
 	},
 	"suggest": {
 		"ext-gd": "GDlib/Freetype is required for building images with text (GIFBUILDER) and can also be used to scale images",
@@ -89,14 +92,23 @@
 	"conflict": {
 		"symfony/cache": "< 2.8.50 >= 2.8.0 || < 3.4.26 >= 3.4.0 || < 4.1.12 >= 4.1.0 || < 4.2.7 >= 4.2.0",
 		"symfony/finder": "2.7.44 || 2.8.37 || 3.4.7 || 4.0.7",
-		"symfony/routing": "4.2.7"
+		"symfony/routing": "4.2.7",
+		"phpdocumentor/reflection-docblock": ">= 4.3.2"
+	},
+	"provide": {
+		"psr/http-client-implementation": "1.0",
+		"psr/http-factory-implementation": "1.0",
+		"psr/http-message-implementation": "1.0"
 	},
 	"extra": {
 		"typo3/class-alias-loader": {
+			"class-alias-maps": [
+				"typo3/sysext/core/Migrations/Code/ClassAliasMap.php"
+			],
 			"always-add-alias-loader": true
 		},
 		"branch-alias": {
-			"dev-master": "10.0.x-dev"
+			"dev-master": "10.2.x-dev"
 		}
 	},
 	"scripts": {
@@ -223,6 +235,7 @@
 			"TYPO3\\CMS\\Impexp\\Tests\\": "typo3/sysext/impexp/Tests/",
 			"TYPO3\\CMS\\IndexedSearch\\Tests\\": "typo3/sysext/indexed_search/Tests/",
 			"TYPO3\\CMS\\Install\\Tests\\": "typo3/sysext/install/Tests/",
+			"TYPO3\\CMS\\Linkvalidator\\Tests\\": "typo3/sysext/linkvalidator/Tests/",
 			"TYPO3\\CMS\\Lowlevel\\Tests\\": "typo3/sysext/lowlevel/Tests/",
 			"TYPO3\\CMS\\Opendocs\\Tests\\": "typo3/sysext/opendocs/Tests/",
 			"TYPO3\\CMS\\Redirects\\Tests\\": "typo3/sysext/redirects/Tests/",

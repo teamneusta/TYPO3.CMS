@@ -34,6 +34,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\BackendWorkspaceRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\ReferenceIndex;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\RedirectResponse;
@@ -51,7 +52,6 @@ use TYPO3\CMS\Core\Utility\HttpUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * Main backend controller almost always used if some database record is edited in the backend.
@@ -71,7 +71,6 @@ class EditDocumentController
     /**
      * An array looking approx like [tablename][list-of-ids]=command, eg. "&edit[pages][123]=edit".
      *
-     * @see \TYPO3\CMS\Backend\Utility\BackendUtility::editOnClick()
      * @var array
      */
     protected $editconf = [];
@@ -136,7 +135,7 @@ class EditDocumentController
      *
      * @var array
      * @todo: Will be set protected later, still used by ConditionMatcher
-     * @internal Will be removed / protected in TYPO3 v10.0 without further notice
+     * @internal Will be removed / protected in TYPO3 v10.x without further notice
      */
     public $data;
 
@@ -296,7 +295,7 @@ class EditDocumentController
      *
      * @var array
      * @todo: Will be set protected later, still used by ConditionMatcher
-     * @internal Will be removed / protected in TYPO3 v10.0 without further notice
+     * @internal Will be removed / protected in TYPO3 v10.x without further notice
      */
     public $elementsData;
 
@@ -458,6 +457,7 @@ class EditDocumentController
         if (!is_array($this->defVals) && is_array($this->overrideVals)) {
             $this->defVals = $this->overrideVals;
         }
+        $this->addSlugFieldsToColumnsOnly($queryParams);
 
         // Set final return URL
         $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
@@ -492,6 +492,28 @@ class EditDocumentController
         $this->emitFunctionAfterSignal('preInit', $request);
 
         return null;
+    }
+
+    /**
+     * Always add required fields of slug field
+     *
+     * @param array $queryParams
+     */
+    protected function addSlugFieldsToColumnsOnly(array $queryParams): void
+    {
+        $data = $queryParams['edit'] ?? [];
+        $data = array_keys($data);
+        $table = reset($data);
+        if ($this->columnsOnly && $table !== false && isset($GLOBALS['TCA'][$table])) {
+            $fields = GeneralUtility::trimExplode(',', $this->columnsOnly, true);
+            foreach ($fields as $field) {
+                if (isset($GLOBALS['TCA'][$table]['columns'][$field]) && $GLOBALS['TCA'][$table]['columns'][$field]['config']['type'] === 'slug') {
+                    foreach ($GLOBALS['TCA'][$table]['columns'][$field]['config']['generatorOptions']['fields'] as $fields) {
+                        $this->columnsOnly .= ',' . (is_array($fields) ? implode(',', $fields) : $fields);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -604,7 +626,7 @@ class EditDocumentController
             reset($this->editconf[$nTable]);
             $nUid = key($this->editconf[$nTable]);
             $recordFields = 'pid,uid';
-            if (!empty($GLOBALS['TCA'][$nTable]['ctrl']['versioningWS'])) {
+            if (BackendUtility::isTableWorkspaceEnabled($nTable)) {
                 $recordFields .= ',t3ver_oid';
             }
             $nRec = BackendUtility::getRecord($nTable, $nUid, $recordFields);
@@ -614,7 +636,7 @@ class EditDocumentController
             // Setting a blank editconf array for a new record:
             $this->editconf = [];
             // Determine related page ID for regular live context
-            if ($nRec['pid'] != -1) {
+            if ($nRec['t3ver_oid'] > 0) {
                 if ($insertRecordOnTop) {
                     $relatedPageId = $nRec['pid'];
                 } else {
@@ -651,7 +673,7 @@ class EditDocumentController
             }
 
             $recordFields = 'pid,uid';
-            if (!empty($GLOBALS['TCA'][$nTable]['ctrl']['versioningWS'])) {
+            if (!BackendUtility::isTableWorkspaceEnabled($nTable)) {
                 $recordFields .= ',t3ver_oid';
             }
             $nRec = BackendUtility::getRecord($nTable, $nUid, $recordFields);
@@ -659,7 +681,7 @@ class EditDocumentController
             // Setting a blank editconf array for a new record:
             $this->editconf = [];
 
-            if ($nRec['pid'] != -1) {
+            if ((int)$nRec['t3ver_oid'] === 0) {
                 $relatedPageId = -$nRec['uid'];
             } else {
                 $relatedPageId = -$nRec['t3ver_oid'];
@@ -750,15 +772,9 @@ class EditDocumentController
         $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
         $pageRenderer->addInlineLanguageLabelFile('EXT:backend/Resources/Private/Language/locallang_alt_doc.xlf');
 
-        $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
-        // override the default jumpToUrl
         $this->moduleTemplate->addJavaScriptCode(
-            'jumpToUrl',
-            '
-            function deleteRecord(table,id,url) {
-                window.location.href = ' . GeneralUtility::quoteJSvalue((string)$uriBuilder->buildUriFromRoute('tce_db') . '&cmd[') . '+table+"]["+id+"][delete]=1&redirect="+escape(url);
-            }
-        ' . (isset($parsedBody['_savedokview']) && $this->popViewId ? $this->generatePreviewCode() : '')
+            'previewCode',
+            (isset($parsedBody['_savedokview']) && $this->popViewId ? $this->generatePreviewCode() : '')
         );
         // Set context sensitive menu
         $this->moduleTemplate->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/Backend/ContextMenu');
@@ -1582,8 +1598,9 @@ class EditDocumentController
             && $this->isSavedRecord
             && count($this->elementsData) === 1
         ) {
+            /** @var UriBuilder $uriBuilder */
+            $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
             $classNames = 't3js-editform-delete-record';
-
             $returnUrl = $this->retUrl;
             if ($this->firstEl['table'] === 'pages') {
                 parse_str((string)parse_url($returnUrl, PHP_URL_QUERY), $queryParams);
@@ -1591,10 +1608,6 @@ class EditDocumentController
                     isset($queryParams['route'], $queryParams['id'])
                     && (string)$this->firstEl['uid'] === (string)$queryParams['id']
                 ) {
-
-                    /** @var UriBuilder $uriBuilder */
-                    $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
-
                     // TODO: Use the page's pid instead of 0, this requires a clean API to manipulate the page
                     // tree from the outside to be able to mark the pid as active
                     $returnUrl = (string)$uriBuilder->buildUriFromRoutePath($queryParams['route'], ['id' => 0]);
@@ -1624,6 +1637,17 @@ class EditDocumentController
                 )
             );
 
+            $deleteUrl = (string)$uriBuilder->buildUriFromRoute('tce_db', [
+                'cmd' => [
+                    $this->firstEl['table'] => [
+                        $this->firstEl['uid'] => [
+                            'delete' => '1'
+                        ]
+                    ]
+                ],
+                'redirect' => $this->retUrl
+            ]);
+
             $deleteButton = $buttonBar->makeLinkButton()
                 ->setClasses($classNames)
                 ->setDataAttributes([
@@ -1633,7 +1657,7 @@ class EditDocumentController
                     'reference-count-message' => $referenceCountMessage,
                     'translation-count-message' => $translationCountMessage
                 ])
-                ->setHref('#')
+                ->setHref($deleteUrl)
                 ->setIcon($this->moduleTemplate->getIconFactory()->getIcon(
                     'actions-edit-delete',
                     Icon::SIZE_SMALL
@@ -2275,15 +2299,16 @@ class EditDocumentController
      */
     protected function getRecordForEdit(string $table, int $theUid)
     {
+        $tableSupportsVersioning = BackendUtility::isTableWorkspaceEnabled($table);
         // Fetch requested record:
-        $reqRecord = BackendUtility::getRecord($table, $theUid, 'uid,pid');
+        $reqRecord = BackendUtility::getRecord($table, $theUid, 'uid,pid' . ($tableSupportsVersioning ? ',t3ver_oid' : ''));
         if (is_array($reqRecord)) {
             // If workspace is OFFLINE:
             if ($this->getBackendUser()->workspace != 0) {
                 // Check for versioning support of the table:
-                if ($GLOBALS['TCA'][$table] && $GLOBALS['TCA'][$table]['ctrl']['versioningWS']) {
+                if ($tableSupportsVersioning) {
                     // If the record is already a version of "something" pass it by.
-                    if ($reqRecord['pid'] == -1) {
+                    if ($reqRecord['t3ver_oid'] > 0) {
                         // (If it turns out not to be a version of the current workspace there will be trouble, but
                         // that is handled inside DataHandler then and in the interface it would clearly be an error of
                         // links if the user accesses such a scenario)
@@ -2296,7 +2321,7 @@ class EditDocumentController
                         $table,
                         $reqRecord['uid'],
                         'uid,pid,t3ver_oid'
-                        );
+                    );
                     return is_array($versionRec) ? $versionRec : $reqRecord;
                 }
                 // This means that editing cannot occur on this record because it was not supporting versioning
@@ -2316,7 +2341,7 @@ class EditDocumentController
      */
     protected function compileStoreData(): void
     {
-        // @todo: Refactor in TYPO3 v10.0: This GeneralUtility method fiddles with _GP()
+        // @todo: Refactor in TYPO3 v10: This GeneralUtility method fiddles with _GP()
         $this->storeArray = GeneralUtility::compileSelectedGetVarsFromArray(
             'edit,defVals,overrideVals,columnsOnly,noView,workspace',
             $this->R_URL_getvars

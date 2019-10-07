@@ -10,4 +10,4 @@
  *
  * The TYPO3 project - inspiring people to share!
  */
-define(["require","exports","jquery"],function(t,e,n){"use strict";return new(function(){function t(){this.registerEvents()}return t.prototype.registerEvents=function(){n('input[type="checkbox"][data-lang]').on("change",this.toggleNewButton)},t.prototype.toggleNewButton=function(t){var e=n(t.currentTarget),r=parseInt(e.data("lang"),10),o=n(".t3js-language-new-"+r),a=n('input[type="checkbox"][data-lang="'+r+'"]:checked');o.toggleClass("disabled",0===a.length)},t}())});
+define(["require","exports","jquery"],function(e,t,n){"use strict";return new class{constructor(){this.registerEvents()}registerEvents(){n('input[type="checkbox"][data-lang]').on("change",this.toggleNewButton)}toggleNewButton(e){const t=n(e.currentTarget),a=parseInt(t.data("lang"),10),s=n(".t3js-language-new-"+a),r=n('input[type="checkbox"][data-lang="'+a+'"]:checked'),g=[];r.each((e,t)=>{g.push("edit[pages]["+t.dataset.uid+"]=new")});const c=s.data("editUrl")+"&"+g.join("&");s.attr("href",c),s.toggleClass("disabled",0===r.length)}}});

@@ -26,6 +26,7 @@ use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\RedirectResponse;
 use TYPO3\CMS\Core\Imaging\Icon;
@@ -34,7 +35,6 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * Script class for 'db_new'
@@ -480,7 +480,7 @@ class NewRecordController
         if ($displayNewPagesIntoLink
             && $this->isTableAllowedOnPage('pages', $this->pageinfo)
             && $this->getBackendUserAuthentication()->check('tables_modify', 'pages')
-            && $this->getBackendUserAuthentication()->workspaceCreateNewRecord(($this->pageinfo['_ORIG_uid'] ?: $this->id), 'pages')
+            && $this->getBackendUserAuthentication()->workspaceCanCreateNewRecord('pages')
         ) {
             // Create link to new page inside:
             $recordIcon = $this->moduleTemplate->getIconFactory()->getIconForRecord($table, [], Icon::SIZE_SMALL)->render();
@@ -494,7 +494,7 @@ class NewRecordController
         if ($displayNewPagesAfterLink
             && $this->isTableAllowedOnPage('pages', $this->pidInfo)
             && $this->getBackendUserAuthentication()->check('tables_modify', 'pages')
-            && $this->getBackendUserAuthentication()->workspaceCreateNewRecord($this->pidInfo['uid'], 'pages')
+            && $this->getBackendUserAuthentication()->workspaceCanCreateNewRecord('pages')
         ) {
             $newPageLinks[] = $this->renderLink(
                 $pageIcon . htmlspecialchars($lang->sL($v['ctrl']['title'])) . ' (' . htmlspecialchars($lang->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:db_new.php.after')) . ')',
@@ -536,7 +536,7 @@ class NewRecordController
                         && $this->isTableAllowedOnPage($table, $this->pageinfo)
                         && $this->getBackendUserAuthentication()->check('tables_modify', $table)
                         && ($rootLevelConfiguration === -1 || ($this->id xor $rootLevelConfiguration))
-                        && $this->getBackendUserAuthentication()->workspaceCreateNewRecord(($this->pageinfo['_ORIG_uid'] ? $this->pageinfo['_ORIG_uid'] : $this->id), $table)
+                        && $this->getBackendUserAuthentication()->workspaceCanCreateNewRecord($table)
                     ) {
                         $newRecordIcon = $this->moduleTemplate->getIconFactory()->getIconForRecord($table, [], Icon::SIZE_SMALL)->render();
                         $rowContent = '';
@@ -732,7 +732,7 @@ class NewRecordController
             $allowedTableList = $GLOBALS['PAGES_TYPES']['default']['allowedTables'];
         }
         // If all tables or the table is listed as an allowed type, return TRUE
-        if (strstr($allowedTableList, '*') || GeneralUtility::inList($allowedTableList, $table)) {
+        if (strpos($allowedTableList, '*') !== false || GeneralUtility::inList($allowedTableList, $table)) {
             return true;
         }
 
@@ -769,25 +769,6 @@ class NewRecordController
         }
 
         return !in_array($table, $deniedNewTables) && (empty($allowedNewTables) || in_array($table, $allowedNewTables));
-    }
-
-    /**
-     * Checks if sys_language records are present
-     *
-     * @return bool
-     */
-    protected function checkIfLanguagesExist(): bool
-    {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable('sys_language');
-        $queryBuilder->getRestrictions()->removeAll();
-
-        $count = $queryBuilder
-            ->count('uid')
-            ->from('sys_language')
-            ->execute()
-            ->fetchColumn(0);
-        return (bool)$count;
     }
 
     /**

@@ -559,4 +559,76 @@ return [
             'Deprecation-88559-TSFE-sys_language_isocode.rst',
         ],
     ],
+    'TYPO3\CMS\IndexedSearch\Indexer->cHashParams' => [
+        'restFiles' => [
+            'Breaking-88741-CHashCalculationInIndexedSearchRemoved.rst',
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController->fePreview' => [
+        'restFiles' => [
+            'Feature-88791-IntroducePreviewAspectInContext.rst',
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->modSharedTSconfig' => [
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst',
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->no_noWrap' => [
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst',
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->setLMargin' => [
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst',
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->JScode' => [
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst',
+        ],
+    ],
+    'TYPO3\CMS\Recordlist\RecordList\DatabaseRecordList->leftMargin' => [
+        'restFiles' => [
+            'Breaking-88779-RecordListRemoveUnusedCode.rst',
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController->forceTemplateParsing' => [
+        'restFiles' => [
+            'Deprecation-88792-ForceTemplateParsingInTSFEAndTemplateService.rst',
+            'Feature-88792-AddTypoScriptAspectToHandleTypoScriptRenderingContextSettings.rst',
+        ],
+    ],
+    'TYPO3\CMS\Core\TypoScript\TemplateService->forceTemplateParsing' => [
+        'restFiles' => [
+            'Deprecation-88792-ForceTemplateParsingInTSFEAndTemplateService.rst',
+            'Feature-88792-AddTypoScriptAspectToHandleTypoScriptRenderingContextSettings.rst',
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController->cHash' => [
+        'restFiles' => [
+            'Deprecation-89001-InternalPublicTSFEProperties.rst',
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController->cHash_array' => [
+        'restFiles' => [
+            'Deprecation-89001-InternalPublicTSFEProperties.rst',
+        ],
+    ],
+    'TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController->domainStartPage' => [
+        'restFiles' => [
+            'Deprecation-89001-InternalPublicTSFEProperties.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->changeLog' => [
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
+    'TYPO3\CMS\Backend\History\RecordHistory->lastHistoryEntry' => [
+        'restFiles' => [
+            'Deprecation-89127-CleanupRecordHistoryHandling.rst',
+        ],
+    ],
 ];

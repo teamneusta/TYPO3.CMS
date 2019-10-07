@@ -22,24 +22,27 @@ use TYPO3\CMS\Backend\FrontendBackendUserAuthentication;
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Charset\CharsetConverter;
 use TYPO3\CMS\Core\Charset\UnknownCharsetException;
-use TYPO3\CMS\Core\Compatibility\PublicPropertyDeprecationTrait;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Context\DateTimeAspect;
 use TYPO3\CMS\Core\Context\LanguageAspect;
 use TYPO3\CMS\Core\Context\LanguageAspectFactory;
+use TYPO3\CMS\Core\Context\TypoScriptAspect;
 use TYPO3\CMS\Core\Context\UserAspect;
 use TYPO3\CMS\Core\Context\VisibilityAspect;
 use TYPO3\CMS\Core\Context\WorkspaceAspect;
 use TYPO3\CMS\Core\Core\Environment;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\EndTimeRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\StartTimeRestriction;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Error\Http\PageNotFoundException;
 use TYPO3\CMS\Core\Error\Http\ServiceUnavailableException;
 use TYPO3\CMS\Core\Error\Http\ShortcutTargetPageNotFoundException;
 use TYPO3\CMS\Core\Exception\Page\RootLineException;
 use TYPO3\CMS\Core\Http\ImmediateResponseException;
+use TYPO3\CMS\Core\Http\ServerRequestFactory;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Localization\Locales;
 use TYPO3\CMS\Core\Locking\Exception\LockAcquireWouldBlockException;
@@ -50,6 +53,7 @@ use TYPO3\CMS\Core\PageTitle\PageTitleProviderManager;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Routing\PageArguments;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\Entity\SiteInterface;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\TimeTracker\TimeTracker;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
@@ -62,11 +66,11 @@ use TYPO3\CMS\Core\Utility\HttpUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Core\Utility\RootlineUtility;
+use TYPO3\CMS\Frontend\Aspect\PreviewAspect;
 use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 use TYPO3\CMS\Frontend\Page\CacheHashCalculator;
 use TYPO3\CMS\Frontend\Page\PageAccessFailureReasons;
-use TYPO3\CMS\Frontend\Page\PageRepository;
 use TYPO3\CMS\Frontend\Resource\FilePathSanitizer;
 
 /**
@@ -87,11 +91,6 @@ use TYPO3\CMS\Frontend\Resource\FilePathSanitizer;
 class TypoScriptFrontendController implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
-    use PublicPropertyDeprecationTrait;
-
-    private $deprecatedPublicProperties = [
-        'sys_language_isocode' => 'Using $TSFE->sys_language_isocode will not be available anymore in TYPO3 v11.0. Use the current Site Language object and its method "getTwoLetterIsoCode()" instead.'
-    ];
 
     /**
      * The page id (int)
@@ -106,11 +105,22 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     public $type = '';
 
     /**
+     * @var Site
+     */
+    protected $site;
+
+    /**
+     * @var SiteLanguage
+     */
+    protected $language;
+
+    /**
      * The submitted cHash
      * @var string
      * @internal
+     * @deprecated will be removed in TYPO3 v11.0. don't use it anymore, as this is now within the PageArguments property.
      */
-    public $cHash = '';
+    protected $cHash = '';
 
     /**
      * @var PageArguments
@@ -181,8 +191,9 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      * Domain start page
      * @var int
      * @internal
+     * @deprecated will be removed in TYPO3 v11.0. don't use it anymore, as this is now within the Site. see $this->site->getRootPageId()
      */
-    public $domainStartPage = 0;
+    protected $domainStartPage = 0;
 
     /**
      * Array containing a history of why a requested page was not accessible.
@@ -222,8 +233,9 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      * page.
      * @var int
      * @internal
+     * @deprecated will be removed in TYPO3 v11.0. don't use it anymore, as this is now within PreviewAspect
      */
-    public $fePreview = 0;
+    protected $fePreview = 0;
 
     /**
      * Value that contains the simulated usergroup if any
@@ -299,7 +311,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
 
     /**
      * This hash is unique to the template, the $this->id and $this->type vars and
-     * the gr_list (list of groups). Used to get and later store the cached data
+     * the list of groups. Used to get and later store the cached data
      * @var string
      * @internal
      */
@@ -318,15 +330,17 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     /**
      * Passed to TypoScript template class and tells it to force template rendering
      * @var bool
+     * @deprecated
      */
-    public $forceTemplateParsing = false;
+    private $forceTemplateParsing = false;
 
     /**
      * The array which cHash_calc is based on, see PageArgumentValidator class.
      * @var array
      * @internal
+     * @deprecated will be removed in TYPO3 v11.0. don't use it anymore, see getRelevantParametersForCachingFromPageArguments()
      */
-    public $cHash_array = [];
+    protected $cHash_array = [];
 
     /**
      * May be set to the pagesTSconfig
@@ -466,7 +480,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     /**
      * Is set to the iso code of the current language
      * @var string
-     * @deprecated don't use it anymore, as this is now within SiteLanguage->getTwoLetterIsoCode()
+     * @deprecated will be removed in TYPO3 v11.0. don't use it anymore, as this is now within SiteLanguage->getTwoLetterIsoCode()
      */
     protected $sys_language_isocode = '';
 
@@ -648,31 +662,195 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     protected $context;
 
     /**
-     * Class constructor
-     * Takes a number of GET/POST input variable as arguments and stores them internally.
-     * The processing of these variables goes on later in this class.
+     * Since TYPO3 v10.0, TSFE is composed out of
+     *  - Context
+     *  - Site
+     *  - SiteLanguage
+     *  - PageArguments (containing ID, Type, cHash and MP arguments)
+     *
+     * With TYPO3 v11, they will become mandatory and the method arguments will become strongly typed.
+     * For TYPO3 v10 this is built in a way to ensure maximum compatibility.
+     *
      * Also sets a unique string (->uniqueString) for this script instance; A md5 hash of the microtime()
      *
-     * @param array $_ unused, previously defined to set TYPO3_CONF_VARS
-     * @param mixed $id The value of GeneralUtility::_GP('id')
-     * @param int $type The value of GeneralUtility::_GP('type')
-     * @param bool|string $_1 unused, previously the value of GeneralUtility::_GP('no_cache')
-     * @param string $cHash The value of GeneralUtility::_GP('cHash')
-     * @param string $_2 previously was used to define the jumpURL
-     * @param string $MP The value of GeneralUtility::_GP('MP')
+     * @param Context|array|null $context the Context object to work on, previously defined to set TYPO3_CONF_VARS
+     * @param mixed|SiteInterface $siteOrId The resolved site to work on, previously this was the value of GeneralUtility::_GP('id')
+     * @param SiteLanguage|int|string $siteLanguageOrType The resolved language to work on, previously the value of GeneralUtility::_GP('type')
+     * @param bool|string|PageArguments|null $pageArguments The PageArguments object containing ID, type and GET parameters, previously unused or the value of GeneralUtility::_GP('no_cache')
+     * @param string|FrontendUserAuthentication|null $cHashOrFrontendUser FrontendUserAuthentication object, previously the value of GeneralUtility::_GP('cHash'), use the PageArguments object instead, will be removed in TYPO3 v11.0
+     * @param string|null $_2 previously was used to define the jumpURL, use the PageArguments object instead, will be removed in TYPO3 v11.0
+     * @param string|null $MP The value of GeneralUtility::_GP('MP'), use the PageArguments object instead, will be removed in TYPO3 v11.0
      */
-    public function __construct($_ = null, $id, $type, $_1 = null, $cHash = '', $_2 = null, $MP = '')
+    public function __construct($context = null, $siteOrId = null, $siteLanguageOrType = null, $pageArguments = null, $cHashOrFrontendUser = null, $_2 = null, $MP = null)
     {
-        // Setting some variables:
-        $this->id = $id;
-        $this->type = $type;
-        $this->cHash = $cHash;
-        $this->MP = $GLOBALS['TYPO3_CONF_VARS']['FE']['enable_mount_pids'] ? (string)$MP : '';
+        $this->initializeContextWithGlobalFallback($context);
+
+        // Fetch the request for fetching data (site/language/pageArguments) for compatibility reasons, not needed
+        // in TYPO3 v11.0 anymore.
+        /** @var ServerRequestInterface $request */
+        $request = $GLOBALS['TYPO3_REQUEST'] ?? ServerRequestFactory::fromGlobals();
+
+        $this->initializeSiteWithCompatibility($siteOrId, $request);
+        $this->initializeSiteLanguageWithCompatibility($siteLanguageOrType, $request);
+        $pageArguments = $this->buildPageArgumentsWithFallback($pageArguments, $request);
+        $pageArguments = $this->initializeFrontendUserOrUpdateCHashArgument($cHashOrFrontendUser, $pageArguments);
+        $pageArguments = $this->initializeLegacyMountPointArgument($MP, $pageArguments);
+
+        $this->setPageArguments($pageArguments);
+
         $this->uniqueString = md5(microtime());
         $this->initPageRenderer();
         $this->initCaches();
-        // Use the global context for now
-        $this->context = GeneralUtility::makeInstance(Context::class);
+    }
+
+    /**
+     * Various initialize methods used for fallback, which can be simplified in TYPO3 v11.0
+     */
+
+    /**
+     * Used to set $this->context. The first argument was $GLOBALS[TYPO3_CONF_VARS] (array) until TYPO3 v8,
+     * so no type hint possible.
+     *
+     * @param Context|array|null $context
+     */
+    private function initializeContextWithGlobalFallback($context): void
+    {
+        if ($context instanceof Context) {
+            $this->context = $context;
+        } else {
+            // Use the global context for now
+            trigger_error('TypoScriptFrontendController requires a context object as first constructor argument in TYPO3 v11.0, now falling back to the global Context. This fallback layer will be removed in TYPO3 v11.0', E_USER_DEPRECATED);
+            $this->context = GeneralUtility::makeInstance(Context::class);
+        }
+        if (!$this->context->hasAspect('frontend.preview')) {
+            $this->context->setAspect('frontend.preview', GeneralUtility::makeInstance(PreviewAspect::class));
+        }
+    }
+
+    /**
+     * Second argument of the constructor. Until TYPO3 v10, this was the Page ID (int/string) but since TYPO3 v10.0
+     * this can also be a SiteInterface object, which will be mandatory in TYPO3 v11.0. If no Site object is given,
+     * this is fetched from the given request object.
+     *
+     * @param SiteInterface|int|string $siteOrId
+     * @param ServerRequestInterface $request
+     */
+    private function initializeSiteWithCompatibility($siteOrId, ServerRequestInterface $request): void
+    {
+        if ($siteOrId instanceof SiteInterface) {
+            $this->site = $siteOrId;
+        } else {
+            trigger_error('TypoScriptFrontendController should evaluate the parameter "id" by the PageArguments object, not by a separate constructor argument. This functionality will be removed in TYPO3 v11.0', E_USER_DEPRECATED);
+            $this->id = $siteOrId;
+            if ($request->getAttribute('site') instanceof SiteInterface) {
+                $this->site = $request->getAttribute('site');
+            } else {
+                throw new \InvalidArgumentException('TypoScriptFrontendController must be constructed with a valid Site object or a resolved site in the current request as fallback. None given.', 1561583122);
+            }
+        }
+    }
+
+    /**
+     * Until TYPO3 v10.0, the third argument of the constructor was given from GET/POST "type" to define the page type
+     * Since TYPO3 v10.0, this argument is requested to be of type SiteLanguage, which will be mandatory in TYPO3 v11.0.
+     * If no SiteLanguage object is given, this is fetched from the given request object.
+     *
+     * @param SiteLanguage|int|string $siteLanguageOrType
+     * @param ServerRequestInterface $request
+     */
+    private function initializeSiteLanguageWithCompatibility($siteLanguageOrType, ServerRequestInterface $request): void
+    {
+        if ($siteLanguageOrType instanceof SiteLanguage) {
+            $this->language = $siteLanguageOrType;
+        } else {
+            trigger_error('TypoScriptFrontendController should evaluate the parameter "type" by the PageArguments object, not by a separate constructor argument. This functionality will be removed in TYPO3 v11.0', E_USER_DEPRECATED);
+            $this->type = $siteLanguageOrType;
+            if ($request->getAttribute('language') instanceof SiteLanguage) {
+                $this->language = $request->getAttribute('language');
+            } else {
+                throw new \InvalidArgumentException('TypoScriptFrontendController must be constructed with a valid SiteLanguage object or a resolved site in the current request as fallback. None given.', 1561583127);
+            }
+        }
+    }
+
+    /**
+     * Since TYPO3 v10.0, the fourth constructor argument should be of type PageArguments. However, until TYPO3 v8,
+     * this was the GET/POST parameter "no_cache". If no PageArguments object is given, the given request is checked
+     * for the PageArguments.
+     *
+     * @param bool|string|PageArguments|null $pageArguments
+     * @param ServerRequestInterface $request
+     * @return PageArguments
+     */
+    private function buildPageArgumentsWithFallback($pageArguments, ServerRequestInterface $request): PageArguments
+    {
+        if ($pageArguments instanceof PageArguments) {
+            return $pageArguments;
+        }
+        if ($request->getAttribute('routing') instanceof PageArguments) {
+            return $request->getAttribute('routing');
+        }
+        trigger_error('TypoScriptFrontendController must be constructed with a valid PageArguments object or a resolved page argument in the current request as fallback. None given.', E_USER_DEPRECATED);
+        $queryParams = $request->getQueryParams();
+        $pageId = $this->id ?: ($queryParams['id'] ?? $request->getParsedBody()['id'] ?? 0);
+        $pageType = $this->type ?: ($queryParams['type'] ?? $request->getParsedBody()['type'] ?? 0);
+        return new PageArguments((int)$pageId, (string)$pageType, [], $queryParams);
+    }
+
+    /**
+     * Since TYPO3 v10.0, the fifth constructor argument is expected to to be of Type FrontendUserAuthentication.
+     * However, up until TYPO3 v9.5 this argument was used to define the "cHash" GET/POST parameter. In order to
+     * ensure maximum compatibility, a deprecation is triggered if an old argument is still used, and PageArguments
+     * are updated accordingly, and returned.
+     *
+     * @param string|FrontendUserAuthentication|null $cHashOrFrontendUser
+     * @param PageArguments $pageArguments
+     * @return PageArguments
+     */
+    private function initializeFrontendUserOrUpdateCHashArgument($cHashOrFrontendUser, PageArguments $pageArguments): PageArguments
+    {
+        if ($cHashOrFrontendUser === null) {
+            return $pageArguments;
+        }
+        if ($cHashOrFrontendUser instanceof FrontendUserAuthentication) {
+            $this->fe_user = $cHashOrFrontendUser;
+            return $pageArguments;
+        }
+        trigger_error('TypoScriptFrontendController should evaluate the parameter "cHash" by the PageArguments object, not by a separate constructor argument. This functionality will be removed in TYPO3 v11.0', E_USER_DEPRECATED);
+        return new PageArguments(
+            $pageArguments->getPageId(),
+            $pageArguments->getPageType(),
+            $pageArguments->getRouteArguments(),
+            array_replace_recursive($pageArguments->getStaticArguments(), ['cHash' => $cHashOrFrontendUser]),
+            $pageArguments->getDynamicArguments()
+        );
+    }
+
+    /**
+     * Since TYPO3 v10.0 the seventh constructor argument is not needed anymore, as all data is already provided by
+     * the given PageArguments object. However, if a specific MP parameter is given anyways, the PageArguments object
+     * is updated and returned.
+     *
+     * @param string|null $MP
+     * @param PageArguments $pageArguments
+     * @return PageArguments
+     */
+    private function initializeLegacyMountPointArgument(?string $MP, PageArguments $pageArguments): PageArguments
+    {
+        if ($MP === null) {
+            return $pageArguments;
+        }
+        trigger_error('TypoScriptFrontendController should evaluate the MountPoint Parameter "MP" by the PageArguments object, not by a separate constructor argument. This functionality will be removed in TYPO3 v11.0', E_USER_DEPRECATED);
+        if (!$GLOBALS['TYPO3_CONF_VARS']['FE']['enable_mount_pids']) {
+            return $pageArguments;
+        }
+        return new PageArguments(
+            $pageArguments->getPageId(),
+            $pageArguments->getPageType(),
+            $pageArguments->getRouteArguments(),
+            array_replace_recursive($pageArguments->getStaticArguments(), ['MP' => $MP]),
+            $pageArguments->getDynamicArguments()
+        );
     }
 
     /**
@@ -775,14 +953,14 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      */
     public function clear_preview()
     {
-        if ($this->fePreview
+        if ($this->context->getPropertyFromAspect('frontend.preview', 'isPreview')
             || $GLOBALS['EXEC_TIME'] !== $GLOBALS['SIM_EXEC_TIME']
             || $this->context->getPropertyFromAspect('visibility', 'includeHiddenPages', false)
             || $this->context->getPropertyFromAspect('visibility', 'includeHiddenContent', false)
         ) {
             $GLOBALS['SIM_EXEC_TIME'] = $GLOBALS['EXEC_TIME'];
             $GLOBALS['SIM_ACCESS_TIME'] = $GLOBALS['ACCESS_TIME'];
-            $this->fePreview = 0;
+            $this->context->setAspect('frontend.preview', GeneralUtility::makeInstance(PreviewAspect::class));
             $this->context->setAspect('date', GeneralUtility::makeInstance(DateTimeAspect::class, new \DateTimeImmutable('@' . $GLOBALS['SIM_EXEC_TIME'])));
             $this->context->setAspect('visibility', GeneralUtility::makeInstance(VisibilityAspect::class));
         }
@@ -814,13 +992,14 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         // If there is a Backend login we are going to check for any preview settings
         $originalFrontendUserGroups = $this->applyPreviewSettings($this->getBackendUser());
         // If the front-end is showing a preview, caching MUST be disabled.
-        if ($this->fePreview) {
+        $isPreview = $this->context->getPropertyFromAspect('frontend.preview', 'isPreview');
+        if ($isPreview) {
             $this->disableCache();
         }
         // Now, get the id, validate access etc:
         $this->fetch_the_id();
         // Check if backend user has read access to this page. If not, recalculate the id.
-        if ($this->isBackendUserLoggedIn() && $this->fePreview && !$this->getBackendUser()->doesUserHaveAccess($this->page, Permission::PAGE_SHOW)) {
+        if ($this->isBackendUserLoggedIn() && $isPreview && !$this->getBackendUser()->doesUserHaveAccess($this->page, Permission::PAGE_SHOW)) {
             // Resetting
             $this->clear_preview();
             $this->fe_user->user[$this->fe_user->usergroup_column] = $originalFrontendUserGroups;
@@ -857,7 +1036,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     /**
      * Evaluates admin panel or workspace settings to see if
      * visibility settings like
-     * - $fePreview
+     * - Preview Aspect: isPreview
      * - Visibility Aspect: includeHiddenPages
      * - Visibility Aspect: includeHiddenContent
      * - $simUserGroup
@@ -879,7 +1058,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
 
         // The preview flag is set if the current page turns out to be hidden
         if ($this->id && $this->determineIdIsHiddenPage()) {
-            $this->fePreview = 1;
+            $this->context->setAspect('frontend.preview', GeneralUtility::makeInstance(PreviewAspect::class, true));
             /** @var VisibilityAspect $aspect */
             $aspect = $this->context->getAspect('visibility');
             $newAspect = GeneralUtility::makeInstance(VisibilityAspect::class, true, $aspect->includeHiddenContent(), $aspect->includeDeletedRecords());
@@ -887,7 +1066,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         }
         // The preview flag will be set if an offline workspace will be previewed
         if ($this->whichWorkspace() > 0) {
-            $this->fePreview = 1;
+            $this->context->setAspect('frontend.preview', GeneralUtility::makeInstance(PreviewAspect::class, true));
         }
         return $this->simUserGroup ? $originalFrontendUserGroup : null;
     }
@@ -916,17 +1095,31 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             ->setMaxResults(1);
 
         // $this->id always points to the ID of the default language page, so we check
-        // currentSiteLanguage to determine if we need to fetch a translation
-        if ($this->getCurrentSiteLanguage() instanceof SiteLanguage && $this->getCurrentSiteLanguage()->getLanguageId() > 0) {
-            $queryBuilder->andWhere(
+        // the current site language to determine if we need to fetch a translation but consider fallbacks
+        if ($this->language->getLanguageId() > 0) {
+            $languagesToCheck = array_merge([$this->language->getLanguageId()], $this->language->getFallbackLanguageIds());
+            // Check for the language and all its fallbacks
+            $constraint = $queryBuilder->expr()->andX(
                 $queryBuilder->expr()->eq('l10n_parent', $queryBuilder->createNamedParameter($this->id, \PDO::PARAM_INT)),
-                $queryBuilder->expr()->eq('sys_language_uid', $queryBuilder->createNamedParameter($this->getCurrentSiteLanguage()->getLanguageId(), \PDO::PARAM_INT))
+                $queryBuilder->expr()->in('sys_language_uid', $queryBuilder->createNamedParameter(array_filter($languagesToCheck), Connection::PARAM_INT_ARRAY))
             );
+            // If the fallback language Ids also contains the default language, this needs to be considered
+            if (in_array(0, $languagesToCheck, true)) {
+                $constraint = $queryBuilder->expr()->orX(
+                    $constraint,
+                    // Ensure to also fetch the default record
+                    $queryBuilder->expr()->andX(
+                        $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($this->id, \PDO::PARAM_INT)),
+                        $queryBuilder->expr()->in('sys_language_uid', 0)
+                    )
+                );
+            }
+            // Ensure that the translated records are shown first (maxResults is set to 1)
+            $queryBuilder->orderBy('sys_language_uid', 'DESC');
         } else {
-            $queryBuilder->andWhere(
-                $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($this->id, \PDO::PARAM_INT))
-            );
+            $constraint = $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($this->id, \PDO::PARAM_INT));
         }
+        $queryBuilder->andWhere($constraint);
 
         $page = $queryBuilder->execute()->fetch();
 
@@ -961,7 +1154,6 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      * - id
      * - requestedId
      * - type
-     * - domainStartPage
      * - sys_page
      * - sys_page->where_groupAccess
      * - sys_page->where_hid_del
@@ -1020,37 +1212,15 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         // We find the first page belonging to the current domain
         $timeTracker->push('fetch_the_id domain/');
         if (!$this->id) {
-            if ($this->domainStartPage) {
-                // If the id was not previously set, set it to the id of the domain.
-                $this->id = $this->domainStartPage;
-            } else {
-                // Find the first 'visible' page in that domain
-                $rootLevelPages = $this->sys_page->getMenu([0], 'uid', 'sorting', '', false);
-                if (!empty($rootLevelPages)) {
-                    $theFirstPage = reset($rootLevelPages);
-                    $this->id = $theFirstPage['uid'];
-                } else {
-                    $message = 'No pages are found on the rootlevel!';
-                    $this->logger->alert($message);
-                    try {
-                        $response = GeneralUtility::makeInstance(ErrorController::class)->unavailableAction(
-                            $GLOBALS['TYPO3_REQUEST'],
-                            $message,
-                            ['code' => PageAccessFailureReasons::NO_PAGES_FOUND]
-                        );
-                        throw new ImmediateResponseException($response, 1533931299);
-                    } catch (ServiceUnavailableException $e) {
-                        throw new ServiceUnavailableException($message, 1301648975);
-                    }
-                }
-            }
+            // If the id was not previously set, set it to the root page id of the site.
+            $this->id = $this->site->getRootPageId();
         }
         $timeTracker->pull();
         $timeTracker->push('fetch_the_id rootLine/');
         // We store the originally requested id
         $this->requestedId = $this->id;
         try {
-            $this->getPageAndRootlineWithDomain($this->domainStartPage);
+            $this->getPageAndRootlineWithDomain($this->site->getRootPageId());
         } catch (ShortcutTargetPageNotFoundException $e) {
             $this->pageNotFound = 1;
         }
@@ -1148,6 +1318,10 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             // Page is 'not found' in case the id itself was not an accessible page. code 1
             $this->pageNotFound = 1;
             try {
+                $requestedPageRowWithoutGroupCheck = $this->sys_page->getPage($this->id, true);
+                if (!empty($requestedPageRowWithoutGroupCheck)) {
+                    $this->pageAccessFailureHistory['direct_access'][] = $requestedPageRowWithoutGroupCheck;
+                }
                 $this->rootLine = GeneralUtility::makeInstance(RootlineUtility::class, $this->id, $this->MP, $this->context)->get();
                 if (!empty($this->rootLine)) {
                     $c = count($this->rootLine) - 1;
@@ -1167,7 +1341,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
                 $this->rootLine = [];
             }
             // If still no page...
-            if (empty($this->page)) {
+            if (empty($requestedPageRowWithoutGroupCheck) && empty($this->page)) {
                 $message = 'The requested page does not exist!';
                 $this->logger->error($message);
                 try {
@@ -1325,13 +1499,14 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         $removeTheRestFlag = false;
         for ($a = 0; $a < $c; $a++) {
             if (!$this->checkPagerecordForIncludeSection($this->rootLine[$a])) {
-                // Add to page access failure history:
+                // Add to page access failure history and mark the page as not found
+                // Keep the rootline however to trigger an access denied error instead of a service unavailable error
                 $this->pageAccessFailureHistory['sub_section'][] = $this->rootLine[$a];
-                $removeTheRestFlag = true;
+                $this->pageNotFound = 2;
             }
 
-            if ($this->rootLine[$a]['doktype'] == PageRepository::DOKTYPE_BE_USER_SECTION) {
-                // If there is a backend user logged in, check if he has read access to the page:
+            if ((int)$this->rootLine[$a]['doktype'] === PageRepository::DOKTYPE_BE_USER_SECTION) {
+                // If there is a backend user logged in, check if they have read access to the page:
                 if ($this->isBackendUserLoggedIn()) {
                     $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
                         ->getQueryBuilderForTable('pages');
@@ -1383,7 +1558,8 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      * @param array $row The page record to evaluate (needs fields: hidden, starttime, endtime, fe_group)
      * @param bool $bypassGroupCheck Bypass group-check
      * @return bool TRUE, if record is viewable.
-     * @see \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::getTreeList(), checkPagerecordForIncludeSection()
+     * @see \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::getTreeList()
+     * @see checkPagerecordForIncludeSection()
      */
     public function checkEnableFields($row, $bypassGroupCheck = false)
     {
@@ -1506,19 +1682,19 @@ class TypoScriptFrontendController implements LoggerAwareInterface
 
     /**
      * Gets ->page and ->rootline information based on ->id. ->id may change during this operation.
-     * If not inside domain, then default to first page in domain.
+     * If not inside a site, then default to first page in site.
      *
-     * @param int $domainStartPage Page uid of the page where the found domain record is (pid of the domain record)
+     * @param int $rootPageId Page uid of the page where the found site is located
      * @internal
      */
-    public function getPageAndRootlineWithDomain($domainStartPage)
+    public function getPageAndRootlineWithDomain($rootPageId)
     {
         $this->getPageAndRootline();
         // Checks if the $domain-startpage is in the rootLine. This is necessary so that references to page-id's from other domains are not possible.
-        if ($domainStartPage && is_array($this->rootLine)) {
+        if ($rootPageId && is_array($this->rootLine)) {
             $idFound = false;
             foreach ($this->rootLine as $key => $val) {
-                if ($val['uid'] == $domainStartPage) {
+                if ($val['uid'] == $rootPageId) {
                     $idFound = true;
                     break;
                 }
@@ -1526,7 +1702,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             if (!$idFound) {
                 // Page is 'not found' in case the id was outside the domain, code 3
                 $this->pageNotFound = 3;
-                $this->id = $domainStartPage;
+                $this->id = $rootPageId;
                 // re-get the page and rootline if the id was not found.
                 $this->getPageAndRootline();
             }
@@ -1547,8 +1723,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      */
     public function reqCHash()
     {
-        $skip = $this->pageArguments !== null && empty($this->pageArguments->getDynamicArguments());
-        if ($this->cHash || $skip) {
+        if (!empty($this->pageArguments->getArguments()['cHash']) || empty($this->pageArguments->getDynamicArguments())) {
             return;
         }
         if ($GLOBALS['TYPO3_CONF_VARS']['FE']['pageNotFoundOnCHashError']) {
@@ -1563,23 +1738,32 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         $this->getTimeTracker()->setTSlogMessage('TSFE->reqCHash(): No &cHash parameter was sent for GET vars though required so caching is disabled', 2);
     }
 
-    /**
-     * @param PageArguments $pageArguments
-     * @internal
-     */
-    public function setPageArguments(PageArguments $pageArguments)
+    protected function setPageArguments(PageArguments $pageArguments): void
     {
         $this->pageArguments = $pageArguments;
+        $this->id = $pageArguments->getPageId();
+        $this->type = $pageArguments->getPageType() ?: 0;
+        if ($GLOBALS['TYPO3_CONF_VARS']['FE']['enable_mount_pids']) {
+            $this->MP = (string)($pageArguments->getArguments()['MP'] ?? '');
+        }
+    }
+
+    /**
+     * Fetches the arguments that are relevant for creating the hash base from the given PageArguments object.
+     * Excluded parameters are not taken into account when calculating the hash base.
+     *
+     * @param PageArguments $pageArguments
+     * @return array
+     */
+    protected function getRelevantParametersForCachingFromPageArguments(PageArguments $pageArguments): array
+    {
         $queryParams = $pageArguments->getDynamicArguments();
-        // Calculated hash is stored in $this->cHash_array.
-        // This is used to cache pages with more parameters than just id and type.
         if (!empty($queryParams) && $pageArguments->getArguments()['cHash'] ?? false) {
             $queryParams['id'] = $pageArguments->getPageId();
-            $this->cHash_array = GeneralUtility::makeInstance(CacheHashCalculator::class)
+            return GeneralUtility::makeInstance(CacheHashCalculator::class)
                 ->getRelevantParameters(HttpUtility::buildQueryString($queryParams));
-        } else {
-            $this->cHash_array = [];
         }
+        return [];
     }
 
     /**
@@ -1745,7 +1929,8 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      * Used to get and later store the cached data.
      *
      * @return string MD5 hash of serialized hash base from createHashBase()
-     * @see getFromCache(), getLockHash()
+     * @see getFromCache()
+     * @see getLockHash()
      */
     protected function getHash()
     {
@@ -1757,7 +1942,8 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      * This hash is unique to the above hash, except that it doesn't contain the template information in $this->all.
      *
      * @return string MD5 hash
-     * @see getFromCache(), getHash()
+     * @see getFromCache()
+     * @see getHash()
      */
     protected function getLockHash()
     {
@@ -1777,24 +1963,22 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      */
     protected function createHashBase($createLockHashBase = false)
     {
-        // Ensure the language base is used for the hash base calculation as well, otherwise TypoScript and page-related rendering
-        // is not cached properly as we don't have any language-specific conditions anymore
-        $siteBase = (string)$this->getCurrentSiteLanguage()->getBase();
-
         // Fetch the list of user groups
         /** @var UserAspect $userAspect */
         $userAspect = $this->context->getAspect('frontend.user');
         $hashParameters = [
             'id' => (int)$this->id,
             'type' => (int)$this->type,
-            'gr_list' => (string)implode(',', $userAspect->getGroupIds()),
+            'groupIds' => (string)implode(',', $userAspect->getGroupIds()),
             'MP' => (string)$this->MP,
-            'siteBase' => $siteBase,
-            // cHash_array includes dynamic route arguments (if route was resolved)
-            'cHash' => $this->cHash_array,
+            'site' => $this->site->getIdentifier(),
+            // Ensure the language base is used for the hash base calculation as well, otherwise TypoScript and page-related rendering
+            // is not cached properly as we don't have any language-specific conditions anymore
+            'siteBase' => (string)$this->language->getBase(),
             // additional variation trigger for static routes
-            'staticRouteArguments' => $this->pageArguments !== null ? $this->pageArguments->getStaticArguments() : null,
-            'domainStartPage' => $this->domainStartPage
+            'staticRouteArguments' => $this->pageArguments->getStaticArguments(),
+            // dynamic route arguments (if route was resolved)
+            'dynamicArguments' => $this->getRelevantParametersForCachingFromPageArguments($this->pageArguments),
         ];
         // Include the template information if we shouldn't create a lock hash
         if (!$createLockHashBase) {
@@ -1819,15 +2003,13 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     public function getConfigArray()
     {
         if (!($this->tmpl instanceof TemplateService)) {
-            $this->tmpl = GeneralUtility::makeInstance(TemplateService::class, $this->context);
+            $this->tmpl = GeneralUtility::makeInstance(TemplateService::class, $this->context, null, $this);
         }
 
         // If config is not set by the cache (which would be a major mistake somewhere) OR if INTincScripts-include-scripts have been registered, then we must parse the template in order to get it
-        if (empty($this->config) || is_array($this->config['INTincScript']) || $this->forceTemplateParsing) {
+        if (empty($this->config) || is_array($this->config['INTincScript']) || $this->context->getPropertyFromAspect('typoscript', 'forcedTemplateParsing')) {
             $timeTracker = $this->getTimeTracker();
             $timeTracker->push('Parse template');
-            // Force parsing, if set?:
-            $this->tmpl->forceTemplateParsing = $this->forceTemplateParsing;
             // Start parsing the TS template. Might return cached version.
             $this->tmpl->start($this->rootLine);
             $timeTracker->pull();
@@ -1947,14 +2129,8 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             GeneralUtility::callUserFunction($_funcRef, $_params, $this);
         }
 
-        $siteLanguage = $this->getCurrentSiteLanguage();
-        if (!$siteLanguage) {
-            throw new PageNotFoundException('Frontend cannot be displayed, as there is no language available', 1557924417);
-        }
-
         // Initialize charset settings etc.
-        $languageKey = $siteLanguage->getTypo3Language();
-        $this->setOutputLanguage($languageKey);
+        $this->setOutputLanguage($this->language->getTypo3Language());
 
         // Rendering charset of HTML page.
         if (isset($this->config['config']['metaCharset']) && $this->config['config']['metaCharset'] !== 'utf-8') {
@@ -1962,7 +2138,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         }
 
         // Get values from site language
-        $languageAspect = LanguageAspectFactory::createFromSiteLanguage($siteLanguage);
+        $languageAspect = LanguageAspectFactory::createFromSiteLanguage($this->language);
 
         $languageId = $languageAspect->getId();
         $languageContentId = $languageAspect->getContentId();
@@ -2070,11 +2246,6 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             $this->updateRootLinesWithTranslations();
         }
 
-        // Finding the ISO code for the currently selected language
-        // fetched by the sys_language record when not fetching content from the default language
-        // @deprecated - can be removed in TYPO3 v11.0
-        $this->sys_language_isocode = $siteLanguage->getTwoLetterIsoCode();
-
         $_params = [];
         foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['tslib/class.tslib_fe.php']['settingLanguage_postProcess'] ?? [] as $_funcRef) {
             GeneralUtility::callUserFunction($_funcRef, $_params, $this);
@@ -2101,9 +2272,8 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     public function settingLocale()
     {
         trigger_error('TSFE->settingLocale() will be removed in TYPO3 v11.0. Use Locales::setSystemLocaleFromSiteLanguage() instead, as this functionality is independent of TSFE.', E_USER_DEPRECATED);
-        $siteLanguage = $this->getCurrentSiteLanguage();
-        if ($siteLanguage->getLocale() && !Locales::setSystemLocaleFromSiteLanguage($siteLanguage)) {
-            $this->getTimeTracker()->setTSlogMessage('Locale "' . htmlspecialchars($siteLanguage->getLocale()) . '" not found.', 3);
+        if ($this->language->getLocale() && !Locales::setSystemLocaleFromSiteLanguage($this->language)) {
+            $this->getTimeTracker()->setTSlogMessage('Locale "' . htmlspecialchars($this->language->getLocale()) . '" not found.', 3);
         }
     }
 
@@ -2239,7 +2409,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             if (@preg_match($needle, $haystack)) {
                 $isAllowed = true;
             }
-        } elseif (strstr($needle, '-')) {
+        } elseif (strpos($needle, '-') !== false) {
             // Range
             if (MathUtility::canBeInterpretedAsInteger($haystack)) {
                 $range = explode('-', $needle);
@@ -2247,11 +2417,11 @@ class TypoScriptFrontendController implements LoggerAwareInterface
                     $isAllowed = true;
                 }
             }
-        } elseif (strstr($needle, '|')) {
+        } elseif (strpos($needle, '|') !== false) {
             // List
             // Trim the input
             $haystack = str_replace(' ', '', $haystack);
-            if (strstr('|' . $needle . '|', '|' . $haystack . '|')) {
+            if (strpos('|' . $needle . '|', '|' . $haystack . '|') !== false) {
                 $isAllowed = true;
             }
         } elseif ((string)$needle === (string)$haystack) {
@@ -2516,7 +2686,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             // Set ->id to the content_from_pid value - we are going to evaluate this pid as was it a given id for a page-display!
             $temp_copy_TSFE->id = $this->page['content_from_pid'];
             $temp_copy_TSFE->MP = '';
-            $temp_copy_TSFE->getPageAndRootlineWithDomain($this->config['config']['content_from_pid_allowOutsideDomain'] ? 0 : $this->domainStartPage);
+            $temp_copy_TSFE->getPageAndRootlineWithDomain($this->config['config']['content_from_pid_allowOutsideDomain'] ? 0 : $this->site->getRootPageId());
             $this->contentPid = (int)$temp_copy_TSFE->id;
             unset($temp_copy_TSFE);
         }
@@ -2851,8 +3021,11 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             : $this->additionalJavaScript;
         $additionalJavaScript = trim($additionalJavaScript);
         if ($jsCode !== '' || $additionalJavaScript !== '') {
+            $doctype = $controller->config['config']['doctype'] ?? 'html5';
+            $scriptAttribute = $doctype === 'html5' ? '' : ' type="text/javascript"';
+
             $this->additionalHeaderData['JSCode'] = '
-<script type="text/javascript">
+<script' . $scriptAttribute . '>
 	/*<![CDATA[*/
 <!--
 ' . $additionalJavaScript . '
@@ -2937,7 +3110,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
             $response = $response->withHeader('Content-Type', $this->contentType . '; charset=' . trim($this->metaCharset));
         }
         // Set header for content language unless disabled
-        $contentLanguage = $this->getCurrentSiteLanguage() instanceof SiteLanguage ? $this->getCurrentSiteLanguage()->getTwoLetterIsoCode() : '';
+        $contentLanguage = $this->language->getTwoLetterIsoCode();
         if (empty($this->config['config']['disableLanguageHeader']) && !empty($contentLanguage)) {
             $response = $response->withHeader('Content-Language', trim($contentLanguage));
         }
@@ -3069,7 +3242,8 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      * Converts relative paths in the HTML source to absolute paths for fileadmin/, typo3conf/ext/ and media/ folders.
      *
      * @internal
-     * @see RequestHandler, INTincScript()
+     * @see \TYPO3\CMS\Frontend\Http\RequestHandler
+     * @see INTincScript()
      */
     public function setAbsRefPrefix()
     {
@@ -3703,21 +3877,6 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     }
 
     /**
-     * Returns the currently configured "site language" if a site is configured (= resolved) in the current request.
-     *
-     * @internal
-     */
-    protected function getCurrentSiteLanguage(): ?SiteLanguage
-    {
-        if (isset($GLOBALS['TYPO3_REQUEST'])
-            && $GLOBALS['TYPO3_REQUEST'] instanceof ServerRequestInterface
-            && $GLOBALS['TYPO3_REQUEST']->getAttribute('language') instanceof SiteLanguage) {
-            return $GLOBALS['TYPO3_REQUEST']->getAttribute('language');
-        }
-        return null;
-    }
-
-    /**
      * Return the global instance of this class.
      *
      * Intended to be used as prototype factory for this class, see Services.yaml.
@@ -3741,5 +3900,178 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         }
 
         throw new \LogicException('TypoScriptFrontendController was tried to be injected before initial creation', 1538370377);
+    }
+
+    public function getLanguage(): SiteLanguage
+    {
+        return $this->language;
+    }
+
+    public function getSite(): Site
+    {
+        return $this->site;
+    }
+
+    public function getContext(): Context
+    {
+        return $this->context;
+    }
+
+    public function getPageArguments(): PageArguments
+    {
+        return $this->pageArguments;
+    }
+
+    /**
+     * Deprecation messages for TYPO3 10 - public properties of TSFE which have been (re)moved
+     */
+
+    /**
+     * Checks if the property of the given name is set.
+     *
+     * Unmarked protected properties must return false as usual.
+     * Marked properties are evaluated by isset().
+     *
+     * This method is not called for public properties.
+     *
+     * @param string $propertyName
+     * @return bool
+     */
+    public function __isset(string $propertyName)
+    {
+        switch ($propertyName) {
+            case 'domainStartPage':
+                trigger_error('Property $TSFE->domainStartPage is not in use anymore as this information is now stored within the Site object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                return  true;
+            case 'cHash':
+                trigger_error('Property $TSFE->cHash is not in use anymore as this information is now stored within the PageArguments object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                return isset($this->pageArguments->getArguments()['cHash']);
+            case 'cHash_array':
+                trigger_error('Property $TSFE->cHash_array is not in use anymore as this information is now stored within the PageArguments object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                $value = $this->getRelevantParametersForCachingFromPageArguments($this->pageArguments);
+                return !empty($value);
+                break;
+            case 'sys_language_isocode':
+                trigger_error('Property $TSFE->sys_language_isocode is not in use anymore as this information is now stored within the SiteLanguage object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                return isset($this->$propertyName);
+            case 'fePreview':
+                trigger_error('Property $TSFE->fePreview is not in use anymore as this information is now stored within the FrontendPreview aspect.', E_USER_DEPRECATED);
+                return $this->context->hasAspect('frontend.preview');
+            case 'forceTemplateParsing':
+                trigger_error('Property $TSFE->forceTemplateParsing is not in use anymore as this information is now stored within the TypoScript aspect.', E_USER_DEPRECATED);
+                return $this->context->hasAspect('typoscript') && $this->context->getPropertyFromAspect('typoscript', 'forcedTemplateParsing');
+        }
+        return false;
+    }
+
+    /**
+     * Gets the value of the property of the given name if tagged.
+     *
+     * The evaluation is done in the assumption that this method is never
+     * reached for a public property.
+     *
+     * @param string $propertyName
+     * @return mixed
+     */
+    public function __get(string $propertyName)
+    {
+        switch ($propertyName) {
+            case 'domainStartPage':
+                trigger_error('Property $TSFE->domainStartPage is not in use anymore as this information is now stored within the Site object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                return $this->site->getRootPageId();
+            case 'cHash':
+                trigger_error('Property $TSFE->cHash is not in use anymore as this information is now stored within the PageArguments object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                return $this->pageArguments->getArguments()['cHash'] ?? false;
+            case 'cHash_array':
+                trigger_error('Property $TSFE->cHash_array is not in use anymore as this information is now stored within the PageArguments object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                return $this->getRelevantParametersForCachingFromPageArguments($this->pageArguments);
+                break;
+            case 'sys_language_isocode':
+                trigger_error('Property $TSFE->sys_language_isocode is not in use anymore as this information is now stored within the SiteLanguage object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                return $this->sys_language_isocode ?? $this->language->getTwoLetterIsoCode();
+            case 'fePreview':
+                trigger_error('Property $TSFE->fePreview is not in use anymore as this information is now stored within the FrontendPreview aspect.', E_USER_DEPRECATED);
+                if ($this->context->hasAspect('frontend.preview')) {
+                    return $this->context->getPropertyFromAspect('frontend.preview', 'isPreview');
+                }
+                break;
+            case 'forceTemplateParsing':
+                trigger_error('Property $TSFE->forceTemplateParsing is not in use anymore as this information is now stored within the TypoScript aspect.', E_USER_DEPRECATED);
+                if ($this->context->hasAspect('typoscript')) {
+                    return $this->context->getPropertyFromAspect('typoscript', 'forcedTemplateParsing');
+                }
+                break;
+        }
+        return $this->$propertyName;
+    }
+
+    /**
+     * Sets the property of the given name if tagged.
+     *
+     * Additionally it's allowed to set unknown properties.
+     *
+     * The evaluation is done in the assumption that this method is never
+     * reached for a public property.
+     *
+     * @param string $propertyName
+     * @param mixed $propertyValue
+     */
+    public function __set(string $propertyName, $propertyValue)
+    {
+        switch ($propertyName) {
+            case 'domainStartPage':
+                trigger_error('Property $TSFE->domainStartPage is not in use anymore as this information is now stored within the Site object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                break;
+            case 'cHash':
+                trigger_error('Property $TSFE->cHash is not in use anymore as this information is now stored within the PageArguments object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                break;
+            case 'cHash_array':
+                trigger_error('Property $TSFE->cHash_array is not in use anymore as this information is now stored within the PageArguments object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                break;
+            case 'sys_language_isocode':
+                trigger_error('Property $TSFE->sys_language_isocode is not in use anymore as this information is now stored within the SiteLanguage object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                break;
+            case 'fePreview':
+                trigger_error('Property $TSFE->fePreview is not in use anymore as this information is now stored within the FrontendPreview aspect.', E_USER_DEPRECATED);
+                $this->context->setAspect('frontend.preview', GeneralUtility::makeInstance(PreviewAspect::class, (bool)$propertyValue));
+                break;
+            case 'forceTemplateParsing':
+                trigger_error('Property $TSFE->forceTemplateParsing is not in use anymore as this information is now stored within the TypoScript aspect.', E_USER_DEPRECATED);
+                $this->context->setAspect('typoscript', GeneralUtility::makeInstance(TypoScriptAspect::class, (bool)$propertyValue));
+                break;
+        }
+        $this->$propertyName = $propertyValue;
+    }
+
+    /**
+     * Unsets the property of the given name if tagged.
+     *
+     * @param string $propertyName
+     */
+    public function __unset(string $propertyName)
+    {
+        switch ($propertyName) {
+            case 'domainStartPage':
+                trigger_error('Property $TSFE->domainStartPage is not in use anymore as this information is now stored within the Site object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                break;
+            case 'cHash':
+                trigger_error('Property $TSFE->cHash is not in use anymore as this information is now stored within the PageArguments object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                break;
+            case 'cHash_array':
+                trigger_error('Property $TSFE->cHash_array is not in use anymore as this information is now stored within the PageArguments object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                break;
+            case 'sys_language_isocode':
+                trigger_error('Property $TSFE->sys_language_isocode is not in use anymore as this information is now stored within the SiteLanguage object. Will be removed in TYPO3 v11.0.', E_USER_DEPRECATED);
+                break;
+            case 'fePreview':
+                trigger_error('Property $TSFE->fePreview is not in use anymore as this information is now stored within the FrontendPreview aspect.', E_USER_DEPRECATED);
+                $this->context->setAspect('frontend.preview', GeneralUtility::makeInstance(PreviewAspect::class, false));
+                break;
+            case 'forceTemplateParsing':
+                trigger_error('Property $TSFE->forceTemplateParsing is not in use anymore as this information is now stored within the TypoScript aspect.', E_USER_DEPRECATED);
+                $this->context->setAspect('typoscript', GeneralUtility::makeInstance(TypoScriptAspect::class, false));
+                break;
+        }
+        unset($this->$propertyName);
     }
 }

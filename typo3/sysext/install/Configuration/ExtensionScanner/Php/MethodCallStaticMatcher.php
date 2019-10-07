@@ -924,4 +924,18 @@ return [
             'Deprecation-88499-BackendUtilitygetViewDomain.rst',
         ],
     ],
+    'TYPO3\CMS\Backend\Utility\BackendUtility::editOnClick' => [
+        'numberOfMandatoryArguments' => 1,
+        'maximumNumberOfArguments' => 3,
+        'restFiles' => [
+            'Deprecation-88787-BackendUtilityEditOnClick.rst'
+        ],
+    ],
+    'TYPO3\CMS\Extbase\Utility\ExtensionUtility::registerPlugin' => [
+        'numberOfMandatoryArguments' => 3,
+        'maximumNumberOfArguments' => 4,
+        'restFiles' => [
+            'Deprecation-88995-CallingRegisterPluginWithVendorName.rst'
+        ],
+    ],
 ];

@@ -18,18 +18,18 @@ class DocumentSaveActions {
   private static instance: DocumentSaveActions = null;
   private preSubmitCallbacks: Array<Function> = [];
 
-  private constructor() {
-    $((): void => {
-      this.initializeSaveHandling();
-    });
-  }
-
   public static getInstance(): DocumentSaveActions {
     if (DocumentSaveActions.instance === null) {
       DocumentSaveActions.instance = new DocumentSaveActions();
     }
 
     return DocumentSaveActions.instance;
+  }
+
+  private constructor() {
+    $((): void => {
+      this.initializeSaveHandling();
+    });
   }
 
   /**
@@ -71,8 +71,8 @@ class DocumentSaveActions {
         const $elem = $('<input />').attr('type', 'hidden').attr('name', name).attr('value', value);
 
         // Run any preSubmit callbacks
-        for (let i = 0; i < this.preSubmitCallbacks.length; ++i) {
-          this.preSubmitCallbacks[i](e);
+        for (let callback of this.preSubmitCallbacks) {
+          callback(e);
 
           if (e.isPropagationStopped()) {
             preventExec = false;

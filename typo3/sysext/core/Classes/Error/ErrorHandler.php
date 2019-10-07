@@ -147,7 +147,7 @@ class ErrorHandler implements ErrorHandlerInterface, LoggerAwareInterface
             return true;
         }
         if ($this->logger) {
-            $this->logger->log(LogLevel::NOTICE - $severity, $message);
+            $this->logger->log(LogLevel::normalizeLevel(LogLevel::NOTICE) - $severity, $message);
         }
 
         // Write error message to TSlog (admin panel)
@@ -174,7 +174,7 @@ class ErrorHandler implements ErrorHandlerInterface, LoggerAwareInterface
                 $message,
                 $errorLevels[$errorLevel],
                 $flashMessageSeverity
-                    );
+            );
             /** @var \TYPO3\CMS\Core\Messaging\FlashMessageService $flashMessageService */
             $flashMessageService = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Messaging\FlashMessageService::class);
             /** @var \TYPO3\CMS\Core\Messaging\FlashMessageQueue $defaultFlashMessageQueue */

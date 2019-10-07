@@ -13,9 +13,12 @@
 		"sort-packages": true
 	},
 	"require": {
-		"typo3/cms-backend": "10.0.*@dev",
-		"typo3/cms-core": "10.0.*@dev",
-		"typo3fluid/fluid": "^2.6.1"
+		"doctrine/dbal": "^2.9",
+		"psr/http-message": "~1.0",
+		"psr/log": "~1.0.0",
+		"typo3/cms-backend": "10.2.*@dev",
+		"typo3/cms-core": "10.2.*@dev",
+		"typo3fluid/fluid": "^2.6.4"
 	},
 	"conflict": {
 		"typo3/cms": "*"
@@ -23,9 +26,13 @@
 	"replace": {
 		"redirects": "*"
 	},
+	"suggest": {
+		"typo3/cms-reports": "Get reports of redirects",
+		"typo3/cms-scheduler": "Execute commands to update redirect status"
+	},
 	"extra": {
 		"branch-alias": {
-			"dev-master": "10.0.x-dev"
+			"dev-master": "10.2.x-dev"
 		},
 		"typo3/cms": {
 			"extension-key": "redirects",

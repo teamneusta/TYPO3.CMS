@@ -139,7 +139,7 @@ define(['jquery',
       } else {
         if (data.command === 'delete') {
           if (data.uid === fsMod.recentIds.web) {
-            _this.selectNode(_this.nodes[0]);
+            _this.selectNode(_this.getFirstNode());
           }
           params = '&cmd[pages][' + data.uid + '][delete]=1';
         } else {
@@ -182,6 +182,10 @@ define(['jquery',
             _this.errorNotification();
           }
         });
+    };
+
+    PageTree.prototype.getFirstNode = function() {
+      return this.nodes[0];
     };
 
     /**
@@ -300,7 +304,7 @@ define(['jquery',
     /**
      * Node selection logic (triggered by different events)
      * Page tree supports only one node to be selected at a time
-     * so the default function from SvgTree needs to be overriden
+     * so the default function from SvgTree needs to be overridden
      *
      * @param {Node} node
      */

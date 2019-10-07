@@ -21,7 +21,7 @@ import ExtensionManagerRepository = require('./Repository');
 import ExtensionManagerUpdate = require('./Update');
 import ExtensionManagerUploadForm = require('./UploadForm');
 import 'datatables';
-import 'TYPO3/CMS/Backend/jquery.clearable';
+import 'TYPO3/CMS/Backend/Input/Clearable';
 
 const securityUtility = new SecurityUtility();
 
@@ -42,6 +42,69 @@ class ExtensionManager {
   public Update: ExtensionManagerUpdate;
   public UploadForm: ExtensionManagerUploadForm;
   public Repository: ExtensionManagerRepository;
+
+  private static getUrlVars(): any {
+    let vars: any = [];
+    let hashes: Array<string> = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+    for (let hash of hashes) {
+      const [k, v] = hash.split('=');
+      vars.push(k);
+      vars[k] = v;
+    }
+    return vars;
+  }
+
+  /**
+   * Special sorting for the extension version column
+   */
+  private static versionCompare(a: string, b: string): number {
+    if (a === b) {
+      return 0;
+    }
+
+    const a_components = a.split('.');
+    const b_components = b.split('.');
+    const len = Math.min(a_components.length, b_components.length);
+
+    // loop while the components are equal
+    for (let i = 0; i < len; i++) {
+      // A bigger than B
+      if (parseInt(a_components[i], 10) > parseInt(b_components[i], 10)) {
+        return 1;
+      }
+
+      // B bigger than A
+      if (parseInt(a_components[i], 10) < parseInt(b_components[i], 10)) {
+        return -1;
+      }
+    }
+
+    // If one's a prefix of the other, the longer one is greaRepository.
+    if (a_components.length > b_components.length) {
+      return 1;
+    }
+
+    if (a_components.length < b_components.length) {
+      return -1;
+    }
+    // Otherwise they are the same.
+    return 0;
+  }
+
+  /**
+   * The extension name column can contain various forms of HTML that
+   * break a direct comparison of values
+   */
+  private static extensionCompare(a: string, b: string): number {
+    const div = document.createElement('div');
+    div.innerHTML = a;
+    const aStr = div.textContent || div.innerText || a;
+
+    div.innerHTML = b;
+    const bStr = div.textContent || div.innerText || b;
+
+    return aStr.trim().localeCompare(bStr.trim());
+  }
 
   constructor() {
     $(() => {
@@ -84,11 +147,14 @@ class ExtensionManager {
         $actionButton.toggleClass('disabled', !$(e.currentTarget).prop('checked'));
       });
 
-      $(ExtensionManagerIdentifier.searchField).clearable({
-        onClear: (): void => {
-          dataTable.search('').draw();
-        },
-      });
+      let searchField: HTMLInputElement;
+      if ((searchField = document.querySelector(ExtensionManagerIdentifier.searchField)) !== null) {
+        searchField.clearable({
+          onClear: (): void => {
+            dataTable.search('').draw();
+          },
+        });
+      }
 
       $(document).on('click', '.t3-button-action-installdistribution', (): void => {
         NProgress.start();
@@ -112,28 +178,28 @@ class ExtensionManager {
   private manageExtensionListing(): DataTables.Api {
     const $searchField = $(ExtensionManagerIdentifier.searchField);
     const dataTable = $(ExtensionManagerIdentifier.extensionlist).DataTable({
-        paging: false,
-        dom: 'lrtip',
-        lengthChange: false,
-        pageLength: 15,
-        stateSave: true,
-        drawCallback: this.bindExtensionListActions,
-        columns: [
-          null,
-          null,
-          {
-            type: 'extension',
-          },
-          null,
-          {
-            type: 'version',
-          }, {
-            orderable: false,
-          },
-          null,
-          null,
-        ],
-      });
+      paging: false,
+      dom: 'lrtip',
+      lengthChange: false,
+      pageLength: 15,
+      stateSave: true,
+      drawCallback: this.bindExtensionListActions,
+      columns: [
+        null,
+        null,
+        {
+          type: 'extension',
+        },
+        null,
+        {
+          type: 'version',
+        }, {
+          orderable: false,
+        },
+        null,
+        null,
+      ],
+    });
 
     $searchField.parents('form').on('submit', () => {
       return false;
@@ -200,70 +266,6 @@ class ExtensionManager {
     });
   }
 
-  private static getUrlVars(): any {
-    let vars: any = [];
-    let hash: Array<string>;
-    let hashes: Array<string> = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
-    for (let i = 0; i < hashes.length; i++) {
-      hash = hashes[i].split('=');
-      vars.push(hash[0]);
-      vars[hash[0]] = hash[1];
-    }
-    return vars;
-  }
-
-  /**
-   * Special sorting for the extension version column
-   */
-  private static versionCompare(a: string, b: string): number {
-    if (a === b) {
-      return 0;
-    }
-
-    const a_components = a.split('.');
-    const b_components = b.split('.');
-    const len = Math.min(a_components.length, b_components.length);
-
-    // loop while the components are equal
-    for (let i = 0; i < len; i++) {
-      // A bigger than B
-      if (parseInt(a_components[i], 10) > parseInt(b_components[i], 10)) {
-        return 1;
-      }
-
-      // B bigger than A
-      if (parseInt(a_components[i], 10) < parseInt(b_components[i], 10)) {
-        return -1;
-      }
-    }
-
-    // If one's a prefix of the other, the longer one is greaRepository.
-    if (a_components.length > b_components.length) {
-      return 1;
-    }
-
-    if (a_components.length < b_components.length) {
-      return -1;
-    }
-    // Otherwise they are the same.
-    return 0;
-  }
-
-  /**
-   * The extension name column can contain various forms of HTML that
-   * break a direct comparison of values
-   */
-  private static extensionCompare(a: string, b: string): number {
-    const div = document.createElement('div');
-    div.innerHTML = a;
-    const aStr = div.textContent || div.innerText || a;
-
-    div.innerHTML = b;
-    const bStr = div.textContent || div.innerText || b;
-
-    return aStr.trim().localeCompare(bStr.trim());
-  }
-
   private updateExtension(data: any): void {
     let i = 0;
     const $form = $('<form>');
@@ -282,8 +284,8 @@ class ExtensionManager {
             comment
               .replace(/(\r\n|\n\r|\r|\n)/g, '\n')
               .split(/\n/).map((line: string): string => {
-              return securityUtility.encodeHtml(line);
-            })
+                return securityUtility.encodeHtml(line);
+              })
               .join('<br>'),
           ),
       ]);
@@ -310,27 +312,27 @@ class ExtensionManager {
             Modal.dismiss();
           },
         }, {
-        text: TYPO3.lang['button.updateExtension'],
-        btnClass: 'btn-warning',
-        trigger: (): void => {
-          $.ajax({
-            url: data.url,
-            data: {
-              tx_extensionmanager_tools_extensionmanagerextensionmanager: {
-                version: $('input:radio[name=version]:checked', Modal.currentModal).val(),
+          text: TYPO3.lang['button.updateExtension'],
+          btnClass: 'btn-warning',
+          trigger: (): void => {
+            $.ajax({
+              url: data.url,
+              data: {
+                tx_extensionmanager_tools_extensionmanagerextensionmanager: {
+                  version: $('input:radio[name=version]:checked', Modal.currentModal).val(),
+                },
               },
-            },
-            dataType: 'json',
-            beforeSend: (): void => {
-              NProgress.start();
-            },
-            complete: (): void => {
-              location.reload();
-            },
-          });
-          Modal.dismiss();
+              dataType: 'json',
+              beforeSend: (): void => {
+                NProgress.start();
+              },
+              complete: (): void => {
+                location.reload();
+              },
+            });
+            Modal.dismiss();
+          },
         },
-      },
       ],
     );
   }
