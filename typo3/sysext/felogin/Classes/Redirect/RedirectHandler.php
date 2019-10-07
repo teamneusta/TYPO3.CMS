@@ -121,9 +121,10 @@ class RedirectHandler
      */
     public function getLogoutRedirectUrl(): string
     {
-        $redirectUrl = $this->getGetpostRedirectUrl();
         if ($this->isRedirectModeActive(RedirectMode::LOGOUT) && $this->userIsLoggedIn) {
             $redirectUrl = $this->redirectModeHandler->redirectModeLogout();
+        } else {
+            $redirectUrl = $this->getGetpostRedirectUrl();
         }
 
         return $redirectUrl;
@@ -136,9 +137,10 @@ class RedirectHandler
      */
     public function getLoginRedirectUrl(): string
     {
-        $redirectUrl = $this->getGetpostRedirectUrl();
         if ($this->isRedirectModeActive(RedirectMode::LOGIN)) {
             $redirectUrl = $this->redirectModeHandler->redirectModeLogin();
+        } else {
+            $redirectUrl = $this->getGetpostRedirectUrl();
         }
 
         return $redirectUrl;
@@ -164,11 +166,12 @@ class RedirectHandler
      */
     protected function handleSuccessfulLogout(string $redirectMode): string
     {
+        $redirectUrl = '';
         if ($redirectMode === RedirectMode::LOGOUT) {
             $redirectUrl = $this->redirectModeHandler->redirectModeLogout();
         }
 
-        return $redirectUrl ?? '';
+        return $redirectUrl;
     }
 
     /**
