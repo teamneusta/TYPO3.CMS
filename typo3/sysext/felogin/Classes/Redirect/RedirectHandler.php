@@ -145,8 +145,7 @@ class RedirectHandler
     }
 
     /**
-     * Is used for alternative redirect urls on redirect mode getpost
-     * Preserve the get/post value
+     * Is used for alternative redirect urls on redirect mode "getpost"
      *
      * @return string
      */
