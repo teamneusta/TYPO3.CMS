@@ -1,5 +1,5 @@
 <?php
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace TYPO3\CMS\Felogin\Redirect;
 
@@ -16,19 +16,10 @@ namespace TYPO3\CMS\Felogin\Redirect;
  * The TYPO3 project - inspiring people to share!
  */
 
-use PDO;
 use Psr\Http\Message\ServerRequestInterface;
-use TYPO3\CMS\Core\Authentication\LoginType;
-use TYPO3\CMS\Core\Context\Context;
-use TYPO3\CMS\Core\Database\Connection;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Mvc\Request;
-use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
 use TYPO3\CMS\Felogin\Validation\RedirectUrlValidator;
-use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
-use function in_array;
 
 /**
  * Handels all kind of
@@ -66,7 +57,8 @@ class ServerRequestHandler
      */
     public function getPropertyFromGetAndPost(string $propertyName)
     {
-        return $this->request->getParsedBody()[$propertyName] ?? $this->request->getQueryParams()[$propertyName] ?? null;
+        return $this->request->getParsedBody()[$propertyName] ?? $this->request->getQueryParams(
+            )[$propertyName] ?? null;
     }
 
     /**
