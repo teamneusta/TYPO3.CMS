@@ -1,5 +1,6 @@
 <?php
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace TYPO3\CMS\Felogin\Tests\Unit\Controller;
 
 /*
@@ -33,7 +34,11 @@ class FrontendLoginControllerTest extends UnitTestCase
 
     public function setUp(): void
     {
-        $GLOBALS['TYPO3_REQUEST'] = (new ServerRequest())->withAttribute('language', new SiteLanguage(0, 'en_US', new Uri('/'), ['typo3Language' => 'en']));
+        $GLOBALS['TYPO3_REQUEST'] = (new ServerRequest())->withAttribute(
+            'language', new SiteLanguage(
+            0, 'en_US', new Uri('/'), ['typo3Language' => 'en']
+        )
+        );
         $GLOBALS['TSFE'] = new \stdClass();
         parent::setUp();
     }
@@ -48,7 +53,7 @@ class FrontendLoginControllerTest extends UnitTestCase
     public function getPreserveGetVarsReturnsCorrectResultDataProvider()
     {
         return [
-            'special get var id is not preserved' => [
+            'special get var id is not preserved'                                               => [
                 [
                     'id' => 42,
                 ],
@@ -57,17 +62,17 @@ class FrontendLoginControllerTest extends UnitTestCase
             ],
             'simple additional parameter is not preserved if not specified in preservedGETvars' => [
                 [
-                    'id' => 42,
+                    'id'      => 42,
                     'special' => 23,
                 ],
                 '',
                 [],
             ],
-            'all params except ignored ones are preserved if preservedGETvars is set to "all"' => [
+            'all params except ignored ones are preserved if preservedGETvars is set to "all"'  => [
                 [
-                    'id' => 42,
-                    'special1' => 23,
-                    'special2' => [
+                    'id'             => 42,
+                    'special1'       => 23,
+                    'special2'       => [
                         'foo' => 'bar',
                     ],
                     'tx_felogin_pi1' => [
@@ -82,7 +87,7 @@ class FrontendLoginControllerTest extends UnitTestCase
                     ],
                 ]
             ],
-            'preserve single parameter' => [
+            'preserve single parameter'                                                         => [
                 [
                     'L' => 42,
                 ],
@@ -91,9 +96,9 @@ class FrontendLoginControllerTest extends UnitTestCase
                     'L' => 42,
                 ],
             ],
-            'preserve whole parameter array' => [
+            'preserve whole parameter array'                                                    => [
                 [
-                    'L' => 3,
+                    'L'          => 3,
                     'tx_someext' => [
                         'foo' => 'simple',
                         'bar' => [
@@ -103,7 +108,7 @@ class FrontendLoginControllerTest extends UnitTestCase
                 ],
                 'L,tx_someext',
                 [
-                    'L' => 3,
+                    'L'          => 3,
                     'tx_someext' => [
                         'foo' => 'simple',
                         'bar' => [
@@ -112,9 +117,9 @@ class FrontendLoginControllerTest extends UnitTestCase
                     ],
                 ],
             ],
-            'preserve part of sub array' => [
+            'preserve part of sub array'                                                        => [
                 [
-                    'L' => 3,
+                    'L'          => 3,
                     'tx_someext' => [
                         'foo' => 'simple',
                         'bar' => [
@@ -124,7 +129,7 @@ class FrontendLoginControllerTest extends UnitTestCase
                 ],
                 'L,tx_someext[bar]',
                 [
-                    'L' => 3,
+                    'L'          => 3,
                     'tx_someext' => [
                         'bar' => [
                             'baz' => 'simple',
@@ -132,15 +137,15 @@ class FrontendLoginControllerTest extends UnitTestCase
                     ],
                 ],
             ],
-            'preserve keys on different levels' => [
+            'preserve keys on different levels'                                                 => [
                 [
-                    'L' => 3,
+                    'L'           => 3,
                     'no-preserve' => 'whatever',
-                    'tx_ext2' => [
+                    'tx_ext2'     => [
                         'foo' => 'simple',
                     ],
-                    'tx_ext3' => [
-                        'bar' => [
+                    'tx_ext3'     => [
+                        'bar'     => [
                             'baz' => 'simple',
                         ],
                         'go-away' => '',
@@ -148,7 +153,7 @@ class FrontendLoginControllerTest extends UnitTestCase
                 ],
                 'L,tx_ext2,tx_ext3[bar]',
                 [
-                    'L' => 3,
+                    'L'       => 3,
                     'tx_ext2' => [
                         'foo' => 'simple',
                     ],
@@ -159,11 +164,11 @@ class FrontendLoginControllerTest extends UnitTestCase
                     ],
                 ],
             ],
-            'preserved value that does not exist in get' => [
+            'preserved value that does not exist in get'                                        => [
                 [],
                 'L,foo%5Bbar%5D',
                 [],
-             ],
+            ],
         ];
     }
 
@@ -177,7 +182,9 @@ class FrontendLoginControllerTest extends UnitTestCase
     public function getPreserveGetVarsReturnsCorrectResult(array $getArray, $preserveVars, $expected)
     {
         $_GET = $getArray;
-        $subject = $this->getAccessibleMock(FrontendLoginController::class, ['dummy'], ['_',  $this->createMock(TypoScriptFrontendController::class)]);
+        $subject = $this->getAccessibleMock(
+            FrontendLoginController::class, ['dummy'], ['_', $this->createMock(TypoScriptFrontendController::class)]
+        );
         $subject->cObj = $this->createMock(ContentObjectRenderer::class);
         $subject->conf['preserveGETvars'] = $preserveVars;
         $this->assertSame($expected, $subject->_call('getPreserveGetVars'));
@@ -189,7 +196,7 @@ class FrontendLoginControllerTest extends UnitTestCase
     public function processUserFieldsRespectsDefaultConfigurationForStdWrapDataProvider()
     {
         return [
-            'Simple casing' => [
+            'Simple casing'                            => [
                 [
                     'username' => 'Holy',
                     'lastname' => 'Wood',
@@ -202,10 +209,10 @@ class FrontendLoginControllerTest extends UnitTestCase
                 [
                     '###FEUSER_USERNAME###' => 'HOLY',
                     '###FEUSER_LASTNAME###' => 'Wood',
-                    '###USER###' => 'HOLY'
+                    '###USER###'            => 'HOLY'
                 ]
             ],
-            'Default config applies' => [
+            'Default config applies'                   => [
                 [
                     'username' => 'Holy',
                     'lastname' => 'O" Mally',
@@ -218,7 +225,7 @@ class FrontendLoginControllerTest extends UnitTestCase
                 [
                     '###FEUSER_USERNAME###' => 'HOLY',
                     '###FEUSER_LASTNAME###' => 'O&quot; Mally',
-                    '###USER###' => 'HOLY'
+                    '###USER###'            => 'HOLY'
                 ]
             ],
             'Specific config overrides default config' => [
@@ -237,10 +244,10 @@ class FrontendLoginControllerTest extends UnitTestCase
                 [
                     '###FEUSER_USERNAME###' => 'HOLY',
                     '###FEUSER_LASTNAME###' => 'O" Mally',
-                    '###USER###' => 'HOLY'
+                    '###USER###'            => 'HOLY'
                 ]
             ],
-            'No given user returns empty array' => [
+            'No given user returns empty array'        => [
                 null,
                 [
                     'username.' => [
@@ -279,7 +286,7 @@ class FrontendLoginControllerTest extends UnitTestCase
     {
         $conf = [
             'redirectMode' => 'refererDomains',
-            'domains' => 'example.com'
+            'domains'      => 'example.com'
         ];
         $subject = $this->getAccessibleMock(FrontendLoginController::class, ['dummy']);
         $subject->_set('conf', $conf);

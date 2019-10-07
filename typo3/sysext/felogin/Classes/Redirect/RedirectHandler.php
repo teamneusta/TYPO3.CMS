@@ -20,7 +20,6 @@ use TYPO3\CMS\Core\Authentication\LoginType;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Request;
-use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 
 /**
  * Do felogin related redirects
@@ -38,11 +37,6 @@ class RedirectHandler
      * @var string
      */
     protected $loginType = '';
-
-    /**
-     * @var FrontendUserAuthentication
-     */
-    protected $feUser;
 
     /**
      * @var array
@@ -73,17 +67,19 @@ class RedirectHandler
     }
 
     /**
-     * initialize handler
+     * Initialize handler
      *
      * @param string $loginType
      * @param array $settings
      * @param Request $request
+     * @throws \TYPO3\CMS\Core\Context\Exception\AspectNotFoundException
      */
     public function init(string $loginType, array $settings, Request $request): void
     {
         $this->loginType = $loginType;
         $this->settings = $settings;
-        $this->userIsLoggedIn = $this->isUserLoggedIn();
+        $this->userIsLoggedIn = (bool)GeneralUtility::makeInstance(Context::class)
+            ->getPropertyFromAspect('frontend.user', 'isLoggedIn');
         $this->redirectModes = $this->extractRedirectModesFromSettings();
 
         $this->redirectModeHandler->init($settings, $request);
@@ -119,14 +115,14 @@ class RedirectHandler
     }
 
     /**
-     * get alternative logout form redirect url if logout and page not accessible
+     * Get alternative logout form redirect url if logout and page not accessible
      *
      * @return string
      */
     public function getLogoutRedirectUrl(): string
     {
         $redirectUrl = $this->getGetpostRedirectUrl();
-        if ($this->isRedirectModeActive(RedirectMode::LOGOUT) && $this->isUserLoggedIn()) {
+        if ($this->isRedirectModeActive(RedirectMode::LOGOUT) && $this->userIsLoggedIn) {
             $redirectUrl = $this->redirectModeHandler->redirectModeLogout();
         }
 
@@ -134,7 +130,7 @@ class RedirectHandler
     }
 
     /**
-     * get alternative login form redirect url
+     * Get alternative login form redirect url
      *
      * @return string
      */
@@ -149,8 +145,7 @@ class RedirectHandler
     }
 
     /**
-     * is used for alternative redirect urls on redirect mode getpost
-     * Placeholder for maybe future options
+     * Is used for alternative redirect urls on redirect mode getpost
      * Preserve the get/post value
      *
      * @return string
@@ -162,30 +157,23 @@ class RedirectHandler
             : '';
     }
 
-    protected function isUserLoggedIn(): bool
-    {
-        return (bool)GeneralUtility::makeInstance(Context::class)
-            ->getPropertyFromAspect('frontend.user', 'isLoggedIn');
-    }
-
     /**
-     * handle redirect mode logout
+     * Handle redirect mode logout
      *
      * @param string $redirectMode
      * @return string
      */
     protected function handleSuccessfulLogout(string $redirectMode): string
     {
-        $redirectUrl = '';
         if ($redirectMode === RedirectMode::LOGOUT) {
             $redirectUrl = $this->redirectModeHandler->redirectModeLogout();
         }
 
-        return $redirectUrl;
+        return $redirectUrl ?? '';
     }
 
     /**
-     * base on setting redirectFirstMethod get first or last entry from redirect url list.
+     * Base on setting redirectFirstMethod get first or last entry from redirect url list.
      *
      * @param array $redirectUrlList
      * @return string
@@ -210,7 +198,7 @@ class RedirectHandler
     }
 
     /**
-     * generate redirect_url for case that the user was successfuly logged in
+     * Generate redirect_url for case that the user was successfuly logged in
      *
      * @param string $redirectMode
      * @return string
@@ -236,7 +224,7 @@ class RedirectHandler
                 $redirectUrl = $this->requestHandler->getRedirectUrlRequestParam();
                 break;
             case RedirectMode::REFERER:
-                $redirectUrl = $this->redirectModeHandler->redirectModeReferer();
+                $redirectUrl = $this->redirectModeHandler->redirectModeReferrer();
                 break;
             case RedirectMode::REFERER_DOMAINS:
                 $redirectUrl = $this->redirectModeHandler->redirectModeRefererDomains();

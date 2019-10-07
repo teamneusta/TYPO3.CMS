@@ -19,6 +19,7 @@ namespace TYPO3\CMS\Felogin\Redirect;
 use PDO;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Request;
@@ -80,7 +81,7 @@ class RedirectModeHandler
     }
 
     /**
-     * initialize handler
+     * Initialize handler
      *
      * @param array $settings
      * @param Request $request
@@ -93,21 +94,18 @@ class RedirectModeHandler
     }
 
     /**
-     * handle redirect mode groupLogin
+     * Handle redirect mode groupLogin
      *
      * @return string
      */
     public function redirectModeGroupLogin(): string
     {
         // taken from dkd_redirect_at_login written by Ingmar Schlecht; database-field changed
-        $redirectUrl = '';
         $groupData = $this->feUser->groupData;
         if (!empty($groupData['uid'])) {
             // take the first group with a redirect page
             $userGroupTable = $this->feUser->usergroup_table;
-            $queryBuilder = GeneralUtility::makeInstance(
-                ConnectionPool::class
-            )->getQueryBuilderForTable($userGroupTable);
+            $queryBuilder = $this->getQueryBuilderForTable($userGroupTable);
             $queryBuilder->getRestrictions()->removeAll();
             $row = $queryBuilder
                 ->select('felogin_redirectPid')
@@ -115,7 +113,7 @@ class RedirectModeHandler
                 ->where(
                     $queryBuilder->expr()->neq(
                         'felogin_redirectPid',
-                        $queryBuilder->createNamedParameter('', PDO::PARAM_STR)
+                        ''
                     ),
                     $queryBuilder->expr()->in(
                         'uid',
@@ -129,25 +127,22 @@ class RedirectModeHandler
                 ->fetch();
 
             if ($row) {
-                $redirectUrl = $this->generateUri((int)$row['felogin_redirectPid']);
+                $redirectUrl = $this->buildUriForPageUid((int)$row['felogin_redirectPid']);
             }
         }
 
-        return $redirectUrl;
+        return $redirectUrl ?? '';
     }
 
     /**
-     * handle redirect mode userLogin
+     * Handle redirect mode userLogin
      *
      * @return string
      */
     public function redirectModeUserLogin(): string
     {
-        $redirectUrl = '';
         $userTable = $this->feUser->user_table;
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable(
-            $userTable
-        );
+        $queryBuilder = $this->getQueryBuilderForTable($userTable);
         $queryBuilder->getRestrictions()->removeAll();
         $row = $queryBuilder
             ->select('felogin_redirectPid')
@@ -155,7 +150,7 @@ class RedirectModeHandler
             ->where(
                 $queryBuilder->expr()->neq(
                     'felogin_redirectPid',
-                    $queryBuilder->createNamedParameter('')
+                    ''
                 ),
                 $queryBuilder->expr()->eq(
                     $this->feUser->userid_column,
@@ -169,37 +164,36 @@ class RedirectModeHandler
             ->fetch();
 
         if ($row) {
-            $redirectUrl = $this->generateUri((int)$row['felogin_redirectPid']);
+            $redirectUrl = $this->buildUriForPageUid((int)$row['felogin_redirectPid']);
         }
 
-        return $redirectUrl;
+        return $redirectUrl ?? '';
     }
 
     /**
-     * handle redirect mode login
+     * Handle redirect mode login
      *
      * @return string
      */
     public function redirectModeLogin(): string
     {
-        $redirectUrl = '';
         $redirectPageLogin = (int)($this->settings['redirectPageLogin'] ?? 0);
         if ($redirectPageLogin !== 0) {
-            $redirectUrl = $this->generateUri($redirectPageLogin);
+            $redirectUrl = $this->buildUriForPageUid($redirectPageLogin);
         }
 
-        return $redirectUrl;
+        return $redirectUrl ?? '';
     }
 
     /**
-     * handle redirect mode referer
+     * Handle redirect mode referrer
      *
      * @return string
+     * @throws \TYPO3\CMS\Extbase\Mvc\Exception\NoSuchArgumentException
      */
-    public function redirectModeReferer(): string
+    public function redirectModeReferrer(): string
     {
         // Avoid redirect when logging in after changing password
-        $redirectUrl = '';
         $redirectReferrer = $this->request->hasArgument('redirectReferrer')
             ? $this->request->getArgument('redirectReferrer')
             : '';
@@ -209,11 +203,11 @@ class RedirectModeHandler
             $redirectUrl = preg_replace('/[&?]logintype=[a-z]+/', '', $this->getRefererRequestParam());
         }
 
-        return $redirectUrl;
+        return $redirectUrl ?? '';
     }
 
     /**
-     * handle redirect mode refererDomains
+     * Handle redirect mode refererDomains
      *
      * @return string
      */
@@ -227,10 +221,9 @@ class RedirectModeHandler
             return '';
         }
 
-        $redirectUrl = '';
         // Auto redirect.
         // Feature to redirect to the page where the user came from (HTTP_REFERER).
-        // Allowed domains to redirect to, can be configured with plugin.tx_felogin_pi1.domains
+        // Allowed domains to redirect to, can be configured with plugin.tx_felogin_login.domains
         // Thanks to plan2.net / Martin Kutschker for implementing this feature.
         // also avoid redirect when logging in after changing password
         if (isset($this->settings['domains']) && $this->settings['domains']) {
@@ -238,10 +231,10 @@ class RedirectModeHandler
             // Is referring url allowed to redirect?
             $match = [];
             if (preg_match('#^http://([[:alnum:]._-]+)/#', $url, $match)) {
-                $redirect_domain = $match[1];
+                $redirectDomain = $match[1];
                 $found = false;
-                foreach (GeneralUtility::trimExplode(',', $this->settings['domains'], true) as $d) {
-                    if (preg_match('/(?:^|\\.)' . $d . '$/', $redirect_domain)) {
+                foreach (GeneralUtility::trimExplode(',', $this->settings['domains'], true) as $domain) {
+                    if (preg_match('/(?:^|\\.)' . $domain . '$/', $redirectDomain)) {
                         $found = true;
                         break;
                     }
@@ -256,42 +249,39 @@ class RedirectModeHandler
             }
         }
 
-        return $redirectUrl;
+        return $redirectUrl ?? '';
     }
 
     /**
-     * handle redirect mode loginError
-     * after login-error
+     * Handle redirect mode loginError after login-error
      *
      * @return string
      */
     public function redirectModeLoginError(): string
     {
-        $redirectUrl = '';
         if ($this->settings['redirectPageLoginError']) {
-            $redirectUrl = $this->generateUri((int)$this->settings['redirectPageLoginError']);
+            $redirectUrl = $this->buildUriForPageUid((int)$this->settings['redirectPageLoginError']);
         }
 
-        return $redirectUrl;
+        return $redirectUrl ?? '';
     }
 
     /**
-     * handle redirect mode logout
+     * Handle redirect mode logout
      *
      * @return string
      */
     public function redirectModeLogout(): string
     {
-        $redirectUrl = '';
         $redirectPageLogout = (int)($this->settings['redirectPageLogout'] ?? 0);
         if ($redirectPageLogout) {
-            $redirectUrl = $this->generateUri($redirectPageLogout);
+            $redirectUrl = $this->buildUriForPageUid($redirectPageLogout);
         }
 
-        return $redirectUrl;
+        return $redirectUrl ?? '';
     }
 
-    protected function generateUri(int $pageUid): string
+    protected function buildUriForPageUid(int $pageUid): string
     {
         $this->uriBuilder->reset();
         $this->uriBuilder->setTargetPageUid($pageUid);
@@ -301,12 +291,17 @@ class RedirectModeHandler
 
     protected function getRefererRequestParam(): string
     {
-        $referer = '';
         $requestReferer = (string)$this->serverRequestHandler->getPropertyFromGetAndPost('referer');
         if ($this->redirectUrlValidator->isValid($requestReferer)) {
             $referer = $requestReferer;
         }
 
-        return $referer;
+        return $referer ?? '';
+    }
+
+    protected function getQueryBuilderForTable(string $tableName): QueryBuilder
+    {
+        return GeneralUtility::makeInstance(ConnectionPool::class)
+            ->getQueryBuilderForTable($tableName);
     }
 }
