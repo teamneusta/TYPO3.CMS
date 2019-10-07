@@ -48,12 +48,12 @@ class LoginController extends ActionController
     /**
      * @var TreeUidListProvider
      */
-    private $treeUidListProvider;
+    protected $treeUidListProvider;
 
     /**
      * @var ServerRequestHandler
      */
-    private $requestHandler;
+    protected $requestHandler;
 
     public function __construct(
         RedirectHandler $redirectHandler,
@@ -66,7 +66,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * initialize redirects
+     * Initialize redirects
      */
     public function initializeAction(): void
     {
@@ -85,7 +85,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * show login form
+     * Show login form
      */
     public function loginAction(): void
     {
@@ -111,7 +111,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * user overview for logged in users
+     * User overview for logged in users
      *
      * @param bool $showLoginMessage
      */
@@ -132,7 +132,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * show logout form
+     * Show logout form
      */
     public function logoutAction(): void
     {
@@ -159,7 +159,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * returns the parsed storagePid list including recursions
+     * Returns the parsed storagePid list including recursions
      *
      * @return string
      */
@@ -172,7 +172,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * handle forwards to overview and logout actions from login action
+     * Handle forwards to overview and logout actions from login action
      */
     protected function handleLoginForwards(): void
     {
@@ -210,7 +210,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * check if the user is logged in
+     * Check if the user is logged in
      *
      * @return bool
      */
@@ -241,7 +241,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * redirect to overview on login successful and setting showLogoutFormAfterLogin disabled
+     * Redirect to overview on login successful and setting showLogoutFormAfterLogin disabled
      *
      * @return bool
      */
@@ -253,7 +253,7 @@ class LoginController extends ActionController
     }
 
     /**
-     * return message key based on user login status
+     * Return message key based on user login status
      *
      * @return string
      */
@@ -303,9 +303,6 @@ class LoginController extends ActionController
         return $signalSlotDispatcher;
     }
 
-    /**
-     * @return bool
-     */
     protected function isLoginOrLogoutInProgress(): bool
     {
         return ($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT);

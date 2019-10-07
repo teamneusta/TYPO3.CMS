@@ -288,7 +288,7 @@ class RecoveryService implements RecoveryServiceInterface, SingletonInterface
         return $mailTemplate;
     }
 
-    private function getSender(): NamedAddress
+    protected function getSender(): NamedAddress
     {
         return new NamedAddress($this->getSenderMailAddress(), $this->getSenderName());
     }

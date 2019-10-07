@@ -51,12 +51,12 @@ class RedirectHandler
     /**
      * @var ServerRequestHandler
      */
-    private $requestHandler;
+    protected $requestHandler;
 
     /**
      * @var RedirectModeHandler
      */
-    private $redirectModeHandler;
+    protected $redirectModeHandler;
 
     public function __construct(
         ServerRequestHandler $requestHandler,

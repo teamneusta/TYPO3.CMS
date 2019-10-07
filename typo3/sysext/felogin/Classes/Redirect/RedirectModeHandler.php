@@ -60,14 +60,9 @@ class RedirectModeHandler
     protected $uriBuilder;
 
     /**
-     * @var array
-     */
-    protected $redirectModes = [];
-
-    /**
      * @var ServerRequestHandler
      */
-    private $serverRequestHandler;
+    protected $serverRequestHandler;
 
     public function __construct(UriBuilder $uriBuilder, ServerRequestHandler $serverRequestHandler)
     {

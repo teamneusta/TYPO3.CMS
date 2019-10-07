@@ -36,7 +36,7 @@ class ServerRequestHandler
     /**
      * @var ServerRequestInterface
      */
-    private $request;
+    protected $request;
 
     public function __construct()
     {
