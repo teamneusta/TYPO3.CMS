@@ -91,9 +91,10 @@ class LoginController extends ActionController
     {
         $this->handleLoginForwards();
 
-        $redirectUrl = $this->requestHandler->getRedirectUrlRequestParam();
         if (!$this->isRedirectDisabled()) {
             $redirectUrl = $this->redirectHandler->getLoginRedirectUrl();
+        } else {
+            $redirectUrl = $this->requestHandler->getRedirectUrlRequestParam();
         }
 
         $this->onSubmitFuncsHook();
@@ -136,9 +137,10 @@ class LoginController extends ActionController
      */
     public function logoutAction(): void
     {
-        $actionUri = $this->requestHandler->getRedirectUrlRequestParam();
         if (!$this->isRedirectDisabled()) {
             $actionUri = $this->redirectHandler->getLogoutRedirectUrl();
+        } else {
+            $actionUri = $this->requestHandler->getRedirectUrlRequestParam();
         }
 
         $this->view->assignMultiple(
@@ -305,6 +307,6 @@ class LoginController extends ActionController
 
     protected function isLoginOrLogoutInProgress(): bool
     {
-        return ($this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT);
+        return $this->loginType === LoginType::LOGIN || $this->loginType === LoginType::LOGOUT;
     }
 }
